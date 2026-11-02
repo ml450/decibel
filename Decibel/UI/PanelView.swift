@@ -7,15 +7,22 @@ struct PanelView: View {
 
     @Environment(AppModel.self) private var model
 
+    /// Same soft fade-and-scale as the popover opening.
+    private static let pageTransition = AnyTransition.opacity.combined(with: .scale(scale: 0.96, anchor: .top))
+
     var body: some View {
-        Group {
+        ZStack(alignment: .top) {
             switch model.page {
-            case .home: HomePage()
-            case .calibrate: CalibrationPage()
+            case .home: HomePage().transition(Self.pageTransition)
+            case .calibrate: CalibrationPage().transition(Self.pageTransition)
             case .device(let uid):
-                if let profile = model.profiles[uid] { DeviceEditPage(profile: profile) } else { HomePage() }
+                Group {
+                    if let profile = model.profiles[uid] { DeviceEditPage(profile: profile) } else { HomePage() }
+                }
+                .transition(Self.pageTransition)
             }
         }
+        .animation(.smooth(duration: 0.3), value: model.page)
         .frame(width: Self.width)
         .fixedSize(horizontal: false, vertical: true)
         // No background of our own: the popover's material (arrow included) shows through as one surface.

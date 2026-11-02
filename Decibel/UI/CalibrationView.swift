@@ -37,7 +37,7 @@ struct CalibrationPage: View {
         let volumeDB = model.volume.isSilent ? nil : model.volume.decibels
 
         VStack(spacing: 0) {
-            PageHeader(title: "Calibrate")
+            PageHeader(title: "Calibrate Device")
             Divider()
             VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 10) {
