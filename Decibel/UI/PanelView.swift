@@ -45,7 +45,7 @@ private struct HomePage: View {
 extension HomePage {
     private var content: some View {
         VStack(spacing: 8) {
-            if model.captureState != .running && !model.isSnapshot { CaptureStatusCard() }
+            if !model.captureState.isHealthy && !model.isSnapshot { CaptureStatusCard() }
             LevelsCard()
             DoseCard()
             DevicesCard()
@@ -119,7 +119,7 @@ private struct CaptureStatusCard: View {
                 CardTitle(title: "Measuring Stopped", symbol: "exclamationmark.triangle")
                 Text(message).font(.callout).foregroundStyle(.secondary)
                 Button("Try Again") { model.startCapture() }.controlSize(.small)
-            case .starting, .running:
+            case .starting, .running, .waiting:
                 HStack { ProgressView().controlSize(.small); Text("Starting…").foregroundStyle(.secondary) }
             }
         }
@@ -484,9 +484,17 @@ private struct FooterStatus: View {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.loud)
                 Text(message).lineLimit(1).foregroundStyle(.secondary)
             case .idle:
-                Image(systemName: model.captureState == .running ? "checkmark.circle.fill" : "pause.circle.fill")
-                    .foregroundStyle(model.captureState == .running ? .green : .secondary)
-                Text(model.captureState == .running ? "Measuring" : "Not measuring")
+                switch model.captureState {
+                case .running:
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    Text("Measuring")
+                case .waiting:
+                    Image(systemName: "waveform.circle.fill").foregroundStyle(.secondary)
+                    Text("Waiting for sound").foregroundStyle(.secondary)
+                default:
+                    Image(systemName: "pause.circle.fill").foregroundStyle(.secondary)
+                    Text("Not measuring")
+                }
             }
         }
         .font(.callout.weight(.medium))

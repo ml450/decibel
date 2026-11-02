@@ -13,7 +13,10 @@ enum PanelPage: Equatable {
 }
 
 enum CaptureState: Equatable {
-    case starting, needsPermission, running, failed(String)
+    /// `waiting`: the tap is off because nothing is playing (so macOS shows no recording indicator).
+    case starting, needsPermission, running, waiting, failed(String)
+
+    var isHealthy: Bool { self == .running || self == .waiting }
 }
 
 @MainActor @Observable
@@ -47,6 +50,14 @@ final class AppModel {
     }()
     /// Core Audio taps need only "System Audio Recording Only" (no screen-sharing indicator).
     @ObservationIgnored private var usesTap: Bool { !(capture is SystemAudioCapture) }
+    @ObservationIgnored private var lastPlaybackAt = Date.distantPast
+    @ObservationIgnored private var pausing = false
+
+    /// Whether any other app is playing sound right now (process taps only; ScreenCaptureKit always runs).
+    private var othersPlaying: Bool {
+        if #available(macOS 14.2, *), usesTap { return AudioActivity.othersPlaying() }
+        return true
+    }
     @ObservationIgnored private let monitor = OutputDeviceMonitor()
     @ObservationIgnored private var pending: [DecibelStore.MinuteKey: LevelAccumulator] = [:]
     @ObservationIgnored private var lastLevelAt = Date.distantPast
@@ -109,7 +120,8 @@ final class AppModel {
 
     // MARK: Capture & permission
 
-    func startCapture() {
+    /// `force` starts the tap even when nothing is playing (so the permission prompt appears now).
+    func startCapture(force: Bool = false) {
         // Show the explanation before the system prompt on first run. After that, let macOS decide:
         // CGPreflightScreenCaptureAccess() can report false while system audio capture is allowed.
         guard UserDefaults.standard.bool(forKey: "askedForAudioCapture")
@@ -118,6 +130,12 @@ final class AppModel {
             return
         }
         guard !capture.isRunning else { captureState = .running; return }
+        guard force || othersPlaying else {
+            captureState = .waiting
+            onLiveChange?()
+            return
+        }
+        lastPlaybackAt = Date()
         captureState = .starting
         Task {
             do {
@@ -141,7 +159,7 @@ final class AppModel {
         if !usesTap, !CGRequestScreenCaptureAccess() {
             openPrivacySettings()
         }
-        startCapture()
+        startCapture(force: true)
     }
 
     func openPrivacySettings() {
@@ -205,9 +223,31 @@ final class AppModel {
 
     private func tick() {
         if let device { volume = OutputDeviceMonitor.volume(of: device.id) }
+        followPlayback()
         // No buffers for a while: nothing is playing.
         if Date().timeIntervalSince(lastLevelAt) > 2.5, liveSPL != nil || liveDBFS != nil {
             setLive(dbfs: nil, spl: nil)
+        }
+    }
+
+    /// Runs the tap only while other apps play sound, and stops it 5 s after they go quiet,
+    /// so the purple "System Audio Recording" indicator only shows while there is something to measure.
+    private func followPlayback() {
+        guard usesTap, !pausing, captureState.isHealthy || captureState == .starting else { return }
+        if othersPlaying {
+            lastPlaybackAt = Date()
+            if captureState == .waiting { startCapture() }
+        } else if capture.isRunning, Date().timeIntervalSince(lastPlaybackAt) > 5 {
+            pausing = true
+            Task {
+                await capture.stop()
+                flush()
+                captureState = .waiting
+                setLive(dbfs: nil, spl: nil)
+                pausing = false
+                log.info("Nothing playing; audio tap paused")
+                onLiveChange?()
+            }
         }
     }
 

@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var model: AppModel!
     private var statusItem: StatusItemController!
     private let popover = NSPopover()
+    private var outsideClickMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if CommandLine.arguments.contains("--selftest") {
@@ -146,7 +147,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         popover.contentViewController?.view.window?.makeKey()
     }
 
-    func popoverDidShow(_ notification: Notification) { darkenPopoverGlass() }
+    func popoverDidShow(_ notification: Notification) {
+        darkenPopoverGlass()
+        // `.transient` only closes when macOS notices we lost focus, which doesn't always happen when you
+        // click another menu bar item (Control Center, volume…). Close on any click outside us instead.
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.popover.behavior == .transient else { return }   // pinned while calibrating
+                self.popover.performClose(nil)
+            }
+        }
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        if let outsideClickMonitor { NSEvent.removeMonitor(outsideClickMonitor) }
+        outsideClickMonitor = nil
+    }
 
     /// Swaps the popover's own glass (which also draws the arrow) for a darker material,
     /// so arrow and body stay one surface.

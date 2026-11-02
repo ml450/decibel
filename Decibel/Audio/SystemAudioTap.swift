@@ -136,3 +136,25 @@ final class SystemAudioTap: SystemAudioSource {
         return status == noErr && object != kAudioObjectUnknown ? object : nil
     }
 }
+
+/// Which processes are playing audio, from Core Audio's process objects (macOS 14.2+).
+@available(macOS 14.2, *)
+enum AudioActivity {
+    /// True when any process other than Decibel has audio output running.
+    static func othersPlaying() -> Bool {
+        let system = AudioObjectID(kAudioObjectSystemObject)
+        var address = CA.address(kAudioHardwarePropertyProcessObjectList)
+        var size: UInt32 = 0
+        // If we can't tell, assume something is playing rather than miss it.
+        guard AudioObjectGetPropertyDataSize(system, &address, 0, nil, &size) == noErr, size > 0 else { return true }
+        var ids = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
+        guard AudioObjectGetPropertyData(system, &address, 0, nil, &size, &ids) == noErr else { return true }
+        let me = getpid()
+        return ids.contains { id in
+            let pid: pid_t? = CA.get(id, CA.address(kAudioProcessPropertyPID))
+            guard pid != me else { return false }
+            let running: UInt32? = CA.get(id, CA.address(kAudioProcessPropertyIsRunningOutput))
+            return running == 1
+        }
+    }
+}
