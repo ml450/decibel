@@ -443,8 +443,6 @@ private struct FooterBar: View {
             .disabled(model.device == nil)
 
             Menu {
-                Button("Calibrate Current Device…") { model.page = .calibrate }
-                Button("Check for Updates…") { Task { await model.updater.check() } }
                 Toggle("Launch at Login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
                 Button("Show Data in Finder") { NSWorkspace.shared.activateFileViewerSelecting([model.store.url]) }
                 Divider()
