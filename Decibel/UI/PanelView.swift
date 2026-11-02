@@ -450,14 +450,12 @@ private struct FooterBar: View {
         .disabled(model.device == nil)
 
         Menu {
-            Section("Decibel \(model.updater.currentVersion)") {
-                Toggle("Launch at Login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
-                Toggle("Show Level in Menu Bar", isOn: Binding(get: { model.showLevelInMenuBar }, set: { model.showLevelInMenuBar = $0 }))
-                ShareLink(item: Uninstaller.downloadPage,
-                          subject: Text("Decibel"),
-                          message: Text("Decibel viser hvor høyt du hører, rett i menylinjen på Macen.")) {
-                    Text("Share Decibel…")
-                }
+            Toggle("Launch at Login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
+            Toggle("Show Level in Menu Bar", isOn: Binding(get: { model.showLevelInMenuBar }, set: { model.showLevelInMenuBar = $0 }))
+            ShareLink(item: Uninstaller.downloadPage,
+                      subject: Text("Decibel"),
+                      message: Text("Decibel viser hvor høyt du hører, rett i menylinjen på Macen.")) {
+                Text("Share Decibel…")
             }
             Divider()
             Button("Uninstall Decibel…") { Uninstaller.confirmAndUninstall(model: model) }
@@ -521,8 +519,7 @@ private struct FooterStatus: View {
                             .help("Audio from " + model.listeningTo.joined(separator: ", "))
                     }
                 case .waiting:
-                    Image(systemName: "waveform.circle.fill").foregroundStyle(.secondary)
-                    Text("Waiting for sound").foregroundStyle(.secondary)
+                    Text("Decibel \(updater.currentVersion)").foregroundStyle(.secondary)
                 default:
                     Image(systemName: "pause.circle.fill").foregroundStyle(.secondary)
                     Text("Not measuring")
