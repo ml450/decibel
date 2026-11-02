@@ -17,6 +17,7 @@ final class Updater {
     private(set) var state: State = .idle
     @ObservationIgnored private var downloadURL: URL?
     @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var lastCheck = Date.distantPast
 
     var currentVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
@@ -27,33 +28,29 @@ final class Updater {
         return false
     }
 
-    /// Quiet checks at launch and every 6 hours; only an available update changes what you see.
+    /// Quiet checks at launch, every hour, and when the panel opens (see `checkIfStale`).
     func startAutomaticChecks() {
         Task { await check(userInitiated: false) }
-        timer = Timer.scheduledTimer(withTimeInterval: 6 * 3600, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { _ = Task { await self?.check(userInitiated: false) } }
         }
+    }
+
+    /// Called every time the panel opens, so a new version shows up right away (30 s guard against double opens).
+    func checkIfStale() {
+        guard Date().timeIntervalSince(lastCheck) > 30 else { return }
+        Task { await check(userInitiated: false) }
     }
 
     func check(userInitiated: Bool = true) async {
         if state == .checking || state == .installing { return }
         let previous = state
         if userInitiated { state = .checking }
+        lastCheck = Date()
         do {
-            var request = URLRequest(url: URL(string: "https://api.github.com/repos/\(Self.repo)/releases/latest")!)
-            request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-            request.cachePolicy = .reloadIgnoringLocalCacheData
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-                throw UpdateError("GitHub answered \((response as? HTTPURLResponse)?.statusCode ?? 0)")
-            }
-            let release = try JSONDecoder().decode(Release.self, from: data)
-            let latest = release.tagName.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
-            guard let asset = release.assets.first(where: { $0.name == Self.assetName }) else {
-                throw UpdateError("The latest release has no \(Self.assetName)")
-            }
+            let latest = try await Self.latestVersion()
             if Self.isNewer(latest, than: currentVersion) {
-                downloadURL = asset.browserDownloadURL
+                downloadURL = URL(string: "https://github.com/\(Self.repo)/releases/download/v\(latest)/\(Self.assetName)")
                 state = .available(version: latest)
             } else {
                 state = userInitiated ? .upToDate : (previous == .checking ? .idle : previous)
@@ -64,6 +61,20 @@ final class Updater {
             state = userInitiated ? .failed("Couldn't check for updates") : previous
             if userInitiated { resetAfterDelay() }
         }
+    }
+
+    /// Reads the newest tag from the redirect github.com/<repo>/releases/latest → …/releases/tag/vX.Y.Z.
+    /// Unlike api.github.com this isn't limited to 60 requests an hour per network, so a whole office can check.
+    static func latestVersion() async throws -> String {
+        var request = URLRequest(url: URL(string: "https://github.com/\(repo)/releases/latest")!)
+        request.httpMethod = "HEAD"
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let final = http.url, final.pathComponents.contains("tag") else {
+            throw UpdateError("No release found")
+        }
+        return final.lastPathComponent.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
     }
 
     /// Downloads the zip, verifies it is a validly signed Decibel, swaps it in and relaunches.
@@ -144,18 +155,6 @@ final class Updater {
             }
             do { try p.run() } catch { cont.resume(throwing: error) }
         }
-    }
-
-    private struct Release: Decodable {
-        let tagName: String
-        let assets: [Asset]
-        enum CodingKeys: String, CodingKey { case tagName = "tag_name", assets }
-    }
-
-    private struct Asset: Decodable {
-        let name: String
-        let browserDownloadURL: URL
-        enum CodingKeys: String, CodingKey { case name, browserDownloadURL = "browser_download_url" }
     }
 
     private struct UpdateError: LocalizedError {
