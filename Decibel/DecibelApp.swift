@@ -121,9 +121,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private var launchedAtLogin: Bool {
-        guard let event = NSAppleEventManager.shared().currentAppleEvent else { return false }
-        return event.eventID == kAEOpenApplication
-            && event.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
+        if let event = NSAppleEventManager.shared().currentAppleEvent,
+           event.eventID == kAEOpenApplication,
+           event.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem {
+            return true
+        }
+        // SMAppService login items don't always carry that flag. The Dock starts with every login,
+        // so if it is under two minutes old, this is a login launch.
+        let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first
+        if let started = dock?.launchDate, Date().timeIntervalSince(started) < 120 { return true }
+        return false
     }
 
     // MARK: Panel
@@ -134,9 +141,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func showPanel(attempt: Int = 0) {
         guard let button = statusItem?.item.button, !popover.isShown else { return }
-        // Right after launch the status item isn't on screen yet and show() would silently do nothing.
-        guard let w = button.window, w.isVisible, w.frame.height > 0 else {
-            if attempt < 30 {
+        // Right after launch the status item isn't laid out yet: its window can be visible but still parked
+        // at (0, 0), and the panel would open in the bottom-left corner. Wait until it sits in the menu bar.
+        guard let w = button.window, w.isVisible, w.frame.height > 0, let screen = w.screen,
+              w.frame.maxY >= screen.frame.maxY - 1, w.frame.minX > screen.frame.minX else {
+            if attempt < 50 {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { self.showPanel(attempt: attempt + 1) }
             }
             return
