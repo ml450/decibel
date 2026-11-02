@@ -65,6 +65,18 @@ final class AppModel {
         deviceChanged(OutputDeviceMonitor.defaultOutputDevice())
     }
 
+    /// Live state for `--snapshot --demo` (AirPods playing at a comfortable level).
+    func applyDemo() {
+        profiles = Dictionary(uniqueKeysWithValues: ((try? store.devices()) ?? []).map { ($0.uid, $0) })
+        let p = DemoData.headphones
+        device = OutputDevice(id: 0, uid: p.uid, name: p.name, transport: p.transport)
+        volume = VolumeInfo(scalar: 0.56, decibels: -12, muted: false, hasControl: true)
+        liveDBFS = -15
+        liveSPL = 71
+        captureState = .running
+        connectedUIDs = [p.uid, DemoData.mac.uid]
+    }
+
     var currentProfile: DeviceProfile? { device.flatMap { profiles[$0.uid] } }
 
     func start() {

@@ -420,6 +420,19 @@ private struct FooterBar: View {
         HStack(spacing: 8) {
             FooterStatus()
             Spacer()
+            if model.isSnapshot {
+                // ImageRenderer can't draw AppKit-backed buttons and menus.
+                ForEach(["arrow.down.circle", "dial.medium", "gearshape"], id: \.self) { Image(systemName: $0) }
+            } else {
+                controls
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+
+    @ViewBuilder
+    private var controls: some View {
             UpdateButton()
 
             Button { model.page = .calibrate } label: {
@@ -443,9 +456,6 @@ private struct FooterBar: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
     }
 }
 

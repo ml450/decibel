@@ -41,21 +41,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             return
         }
 
-        // `--snapshot out.png [light|dark]` renders the panel with the real data and exits (design checks).
-        if let i = CommandLine.arguments.firstIndex(of: "--snapshot"), i + 1 < CommandLine.arguments.count {
-            let dark = CommandLine.arguments.last != "light"
+        // `--snapshot out.png [--demo] [--range M] [light]` renders the panel to a PNG and exits
+        // (design checks; `--demo` uses a throwaway database with a sample month for screenshots).
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--snapshot"), i + 1 < args.count {
+            let dark = !args.contains("light")
             NSApp.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
-            model.isSnapshot = true
-            model.loadCurrentDevice()
+            if args.contains("--demo"), let demo = try? DemoData.makeStore() {
+                model = AppModel(store: demo)
+                model.isSnapshot = true
+                model.applyDemo()
+            } else {
+                model.isSnapshot = true
+                model.loadCurrentDevice()
+            }
+            if let r = args.firstIndex(of: "--range"), r + 1 < args.count, let range = TimeRange(rawValue: args[r + 1]) {
+                model.range = range
+            }
             model.reloadStats()
             // Stand-in for the popover material, which ImageRenderer can't draw.
             let renderer = ImageRenderer(content: PanelView().environment(model)
                 .background(dark ? Color(white: 0.16) : Color(white: 0.93))
                 .environment(\.colorScheme, dark ? .dark : .light))
-            renderer.scale = 2
+            renderer.scale = 3
             if let tiff = renderer.nsImage?.tiffRepresentation,
                let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
-                try? png.write(to: URL(fileURLWithPath: CommandLine.arguments[i + 1]))
+                try? png.write(to: URL(fileURLWithPath: args[i + 1]))
             }
             exit(0)
         }
