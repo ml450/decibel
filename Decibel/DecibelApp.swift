@@ -77,6 +77,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         updateStatusItem()
 
         model.start()
+
+        // `--install-update`: what the Install button does, for testing the update path from Terminal.
+        if CommandLine.arguments.contains("--install-update") {
+            Task {
+                await model.updater.check()
+                guard model.updater.updateAvailable else {
+                    log.info("install-update: no newer version (\(String(describing: self.model.updater.state), privacy: .public))")
+                    return
+                }
+                log.info("install-update: installing")
+                await model.updater.install(beforeQuit: { self.model.flush() })
+            }
+        }
         model.configureLoginItemOnFirstRun()
 
         // Open the panel whenever you launch the app yourself; stay quiet when started at login.

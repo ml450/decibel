@@ -20,7 +20,7 @@ APP=build/DerivedData/Build/Products/Release/Decibel.app
 rm -f build/Decibel.zip
 ditto -c -k --keepParent "$APP" build/Decibel.zip
 
-git commit -qam "Release $VERSION" || true
+git diff --quiet || git commit -qam "Release $VERSION"
 git tag "v$VERSION"
 git push -q origin HEAD "v$VERSION"
 gh release create "v$VERSION" build/Decibel.zip --title "Decibel $VERSION" --notes "$NOTES"
