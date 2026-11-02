@@ -37,6 +37,14 @@ final class AppModel {
     var range: TimeRange = .week { didSet { reloadStats() } }
 
     var page: PanelPage = .home
+
+    /// The coloured level next to the ear in the menu bar (some find it distracting).
+    var showLevelInMenuBar: Bool = UserDefaults.standard.object(forKey: "showLevelInMenuBar") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(showLevelInMenuBar, forKey: "showLevelInMenuBar")
+            onLiveChange?()
+        }
+    }
     private(set) var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     @ObservationIgnored var onLiveChange: (() -> Void)?
@@ -51,12 +59,19 @@ final class AppModel {
     /// Core Audio taps need only "System Audio Recording Only" (no screen-sharing indicator).
     @ObservationIgnored private var usesTap: Bool { !(capture is SystemAudioCapture) }
     @ObservationIgnored private var lastPlaybackAt = Date.distantPast
+    @ObservationIgnored private var lastSoundAt = Date.distantPast
     @ObservationIgnored private var pausing = false
+    /// Set while the tap is paused because it only heard silence; holds the apps that had output open then.
+    @ObservationIgnored private var silencePausedPlayers: Set<pid_t>?
+    @ObservationIgnored private var lastVolume: VolumeInfo?
 
-    /// Whether any other app is playing sound right now (process taps only; ScreenCaptureKit always runs).
-    private var othersPlaying: Bool {
-        if #available(macOS 14.2, *), usesTap { return AudioActivity.othersPlaying() }
-        return true
+    /// Apps that currently have audio output open (shown in the footer while measuring).
+    private(set) var listeningTo: [String] = []
+
+    /// Other processes with audio output running (process taps only; ScreenCaptureKit always runs).
+    private var playingProcesses: Set<pid_t> {
+        if #available(macOS 14.2, *), usesTap { return AudioActivity.playingProcesses() }
+        return [0]
     }
     @ObservationIgnored private let monitor = OutputDeviceMonitor()
     @ObservationIgnored private var pending: [DecibelStore.MinuteKey: LevelAccumulator] = [:]
@@ -130,12 +145,13 @@ final class AppModel {
             return
         }
         guard !capture.isRunning else { captureState = .running; return }
-        guard force || othersPlaying else {
+        guard force || !playingProcesses.isEmpty else {
             captureState = .waiting
             onLiveChange?()
             return
         }
         lastPlaybackAt = Date()
+        lastSoundAt = Date()   // grace period before a silence pause
         captureState = .starting
         Task {
             do {
@@ -191,6 +207,7 @@ final class AppModel {
 
     private func handleSecond(_ dbfs: Double?) {
         lastLevelAt = Date()
+        if dbfs != nil { lastSoundAt = lastLevelAt }
         guard let dbfs, let device, let profile = profiles[device.uid] else {
             setLive(dbfs: nil, spl: nil)
             return
@@ -223,6 +240,9 @@ final class AppModel {
 
     private func tick() {
         if let device { volume = OutputDeviceMonitor.volume(of: device.id) }
+        // Touching the volume is a good hint that sound is (about to be) playing.
+        if let lastVolume, lastVolume.scalar != volume.scalar || lastVolume.muted != volume.muted { wake() }
+        lastVolume = volume
         followPlayback()
         // No buffers for a while: nothing is playing.
         if Date().timeIntervalSince(lastLevelAt) > 2.5, liveSPL != nil || liveDBFS != nil {
@@ -230,25 +250,73 @@ final class AppModel {
         }
     }
 
-    /// Runs the tap only while other apps play sound, and stops it 5 s after they go quiet,
-    /// so the purple "System Audio Recording" indicator only shows while there is something to measure.
+    /// Runs the tap only while there is something to hear, so the purple "System Audio Recording"
+    /// indicator only shows while there is something to measure:
+    /// - no app has audio output open: pause after 5 s;
+    /// - apps have output open but the tap hears only silence for 15 s (Resolve, Teams and browsers
+    ///   often keep output running silently): pause until a new app starts playing, the volume or
+    ///   output device changes, or the panel is opened.
     private func followPlayback() {
         guard usesTap, !pausing, captureState.isHealthy || captureState == .starting else { return }
-        if othersPlaying {
-            lastPlaybackAt = Date()
-            if captureState == .waiting { startCapture() }
-        } else if capture.isRunning, Date().timeIntervalSince(lastPlaybackAt) > 5 {
-            pausing = true
-            Task {
-                await capture.stop()
-                flush()
-                captureState = .waiting
-                setLive(dbfs: nil, spl: nil)
-                pausing = false
-                log.info("Nothing playing; audio tap paused")
-                onLiveChange?()
+        let players = playingProcesses
+        let names = Self.appNames(players)
+        if names != listeningTo { listeningTo = names }
+
+        if players.isEmpty {
+            silencePausedPlayers = nil
+            if capture.isRunning, Date().timeIntervalSince(lastPlaybackAt) > 5 {
+                pause(reason: "Nothing playing")
+            }
+            return
+        }
+        lastPlaybackAt = Date()
+        if captureState == .waiting {
+            if let paused = silencePausedPlayers {
+                guard !players.subtracting(paused).isEmpty else { return }
+                log.info("New app playing; resuming audio tap")
+            }
+            silencePausedPlayers = nil
+            startCapture()
+        } else if capture.isRunning, Date().timeIntervalSince(lastSoundAt) > 15 {
+            pause(reason: "Only silence", players: players)
+        }
+    }
+
+    /// Resume a silence pause right away (panel opened, volume or device changed).
+    func wake() {
+        guard silencePausedPlayers != nil else { return }
+        silencePausedPlayers = nil
+        followPlayback()
+    }
+
+    private func pause(reason: String, players: Set<pid_t>? = nil) {
+        pausing = true
+        Task {
+            await capture.stop()
+            flush()
+            silencePausedPlayers = players
+            captureState = .waiting
+            setLive(dbfs: nil, spl: nil)
+            pausing = false
+            log.info("\(reason, privacy: .public); audio tap paused")
+            onLiveChange?()
+        }
+    }
+
+    /// "Google Chrome" rather than "Google Chrome Helper (Renderer)": the outermost .app in the process path.
+    private static func appNames(_ pids: Set<pid_t>) -> [String] {
+        var names = Set<String>()
+        for pid in pids where pid > 0 {
+            var buffer = [CChar](repeating: 0, count: 4096)
+            guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { continue }
+            let path = String(cString: buffer)
+            if let app = path.split(separator: "/").first(where: { $0.hasSuffix(".app") }) {
+                names.insert(String(app.dropLast(4)))
+            } else {
+                names.insert((path as NSString).lastPathComponent)
             }
         }
+        return names.sorted()
     }
 
     // MARK: Devices
@@ -259,6 +327,7 @@ final class AppModel {
 
     private func deviceChanged(_ newDevice: OutputDevice?) {
         flush()
+        wake()
         device = newDevice
         refreshConnected()
         if let newDevice {

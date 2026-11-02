@@ -155,6 +155,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             return
         }
         model.reloadStats()
+        model.wake()   // opening the panel resumes a silence pause, so the level is live
         NSApp.activate(ignoringOtherApps: true)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
@@ -200,7 +201,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func updateStatusItem() {
         if model.captureState == .needsPermission {
             statusItem?.update(text: "!", color: .systemOrange, toolTip: "Decibel needs audio access")
-        } else if let spl = model.liveSPL {
+        } else if model.showLevelInMenuBar, let spl = model.liveSPL {
             statusItem?.update(text: String(format: "%.0f", spl), color: Theme.levelNSColor(spl),
                                toolTip: String(format: "%.0f dB(A) on %@", spl, model.device?.name ?? ""))
         } else {

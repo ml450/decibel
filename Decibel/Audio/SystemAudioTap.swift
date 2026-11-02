@@ -140,21 +140,22 @@ final class SystemAudioTap: SystemAudioSource {
 /// Which processes are playing audio, from Core Audio's process objects (macOS 14.2+).
 @available(macOS 14.2, *)
 enum AudioActivity {
-    /// True when any process other than Decibel has audio output running.
-    static func othersPlaying() -> Bool {
+    /// PIDs of processes other than Decibel with audio output running.
+    /// If Core Audio can't tell us, report "something" rather than miss sound.
+    static func playingProcesses() -> Set<pid_t> {
         let system = AudioObjectID(kAudioObjectSystemObject)
         var address = CA.address(kAudioHardwarePropertyProcessObjectList)
         var size: UInt32 = 0
-        // If we can't tell, assume something is playing rather than miss it.
-        guard AudioObjectGetPropertyDataSize(system, &address, 0, nil, &size) == noErr, size > 0 else { return true }
+        guard AudioObjectGetPropertyDataSize(system, &address, 0, nil, &size) == noErr, size > 0 else { return [-1] }
         var ids = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
-        guard AudioObjectGetPropertyData(system, &address, 0, nil, &size, &ids) == noErr else { return true }
+        guard AudioObjectGetPropertyData(system, &address, 0, nil, &size, &ids) == noErr else { return [-1] }
         let me = getpid()
-        return ids.contains { id in
-            let pid: pid_t? = CA.get(id, CA.address(kAudioProcessPropertyPID))
-            guard pid != me else { return false }
+        var playing = Set<pid_t>()
+        for id in ids {
+            guard let pid: pid_t = CA.get(id, CA.address(kAudioProcessPropertyPID)), pid != me else { continue }
             let running: UInt32? = CA.get(id, CA.address(kAudioProcessPropertyIsRunningOutput))
-            return running == 1
+            if running == 1 { playing.insert(pid) }
         }
+        return playing
     }
 }

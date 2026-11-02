@@ -452,6 +452,7 @@ private struct FooterBar: View {
         Menu {
             Section("Decibel \(model.updater.currentVersion)") {
                 Toggle("Launch at Login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
+                Toggle("Show Level in Menu Bar", isOn: Binding(get: { model.showLevelInMenuBar }, set: { model.showLevelInMenuBar = $0 }))
                 ShareLink(item: Uninstaller.downloadPage,
                           subject: Text("Decibel"),
                           message: Text("Decibel viser hvor høyt du hører, rett i menylinjen på Macen.")) {
@@ -514,6 +515,11 @@ private struct FooterStatus: View {
                 case .running:
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                     Text("Measuring")
+                    if let first = model.listeningTo.first {
+                        Text("· " + first + (model.listeningTo.count > 1 ? " +\(model.listeningTo.count - 1)" : ""))
+                            .foregroundStyle(.secondary).lineLimit(1)
+                            .help("Audio from " + model.listeningTo.joined(separator: ", "))
+                    }
                 case .waiting:
                     Image(systemName: "waveform.circle.fill").foregroundStyle(.secondary)
                     Text("Waiting for sound").foregroundStyle(.secondary)
