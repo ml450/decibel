@@ -443,17 +443,18 @@ private struct FooterBar: View {
         .disabled(model.device == nil)
 
         Menu {
-            Toggle("Launch at Login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
-            ShareLink(item: Uninstaller.downloadPage,
-                      subject: Text("Decibel"),
-                      message: Text("Decibel viser hvor høyt du hører, rett i menylinjen på Macen.")) {
-                Text("Share Decibel…")
+            Section("Decibel \(model.updater.currentVersion)") {
+                Toggle("Launch at Login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
+                ShareLink(item: Uninstaller.downloadPage,
+                          subject: Text("Decibel"),
+                          message: Text("Decibel viser hvor høyt du hører, rett i menylinjen på Macen.")) {
+                    Text("Share Decibel…")
+                }
             }
             Divider()
             Button("Uninstall Decibel…") { Uninstaller.confirmAndUninstall(model: model) }
-            Divider()
-            Text("Decibel \(model.updater.currentVersion)")
             Button("Quit Decibel") { NSApp.terminate(nil) }
+                .keyboardShortcut("q")
         } label: {
             FooterIcon(symbol: "gearshape")
         }
