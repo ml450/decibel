@@ -422,7 +422,7 @@ private struct FooterBar: View {
             Spacer()
             if model.isSnapshot {
                 // ImageRenderer can't draw AppKit-backed buttons and menus.
-                ForEach(["arrow.down.circle", "dial.medium", "gearshape"], id: \.self) { Image(systemName: $0) }
+                ForEach(["gauge.with.needle", "gearshape"], id: \.self) { FooterIcon(symbol: $0) }
             } else {
                 controls
             }
@@ -433,27 +433,47 @@ private struct FooterBar: View {
 
     @ViewBuilder
     private var controls: some View {
-            UpdateButton()
+        UpdateButton()
 
-            Button { model.page = .calibrate } label: {
-                Image(systemName: "dial.medium")
-            }
-            .buttonStyle(.borderless)
-            .help("Calibrate current device")
-            .disabled(model.device == nil)
+        Button { model.page = .calibrate } label: {
+            FooterIcon(symbol: "gauge.with.needle")
+        }
+        .buttonStyle(.borderless)
+        .help("Calibrate device")
+        .disabled(model.device == nil)
 
-            Menu {
-                Toggle("Launch at Login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
-                Button("Show Data in Finder") { NSWorkspace.shared.activateFileViewerSelecting([model.store.url]) }
-                Divider()
-                Text("Decibel \(model.updater.currentVersion)")
-                Button("Quit Decibel") { NSApp.terminate(nil) }
-            } label: {
-                Image(systemName: "gearshape")
+        Menu {
+            Toggle("Launch at Login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
+            ShareLink(item: Uninstaller.downloadPage,
+                      subject: Text("Decibel"),
+                      message: Text("Decibel viser hvor høyt du hører, rett i menylinjen på Macen.")) {
+                Text("Share Decibel…")
             }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
+            Divider()
+            Button("Uninstall Decibel…") { Uninstaller.confirmAndUninstall(model: model) }
+            Divider()
+            Text("Decibel \(model.updater.currentVersion)")
+            Button("Quit Decibel") { NSApp.terminate(nil) }
+        } label: {
+            FooterIcon(symbol: "gearshape")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Settings")
+    }
+}
+
+/// Same size and frame for every footer icon, so they share one baseline.
+struct FooterIcon: View {
+    let symbol: String
+    var color: Color? = nil
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 15, weight: .regular))
+            .foregroundStyle(color ?? .primary)
+            .frame(width: 22, height: 22)
     }
 }
 
@@ -507,26 +527,20 @@ private struct FooterStatus: View {
 private struct UpdateButton: View {
     @Environment(AppModel.self) private var model
 
+    /// Only shown when an update is ready (or installing).
     var body: some View {
         let updater = model.updater
-        Button {
-            Task {
-                if updater.updateAvailable {
-                    await updater.install(beforeQuit: { model.flush() })
-                } else {
-                    await updater.check()
-                }
+        if updater.state == .installing {
+            ProgressView().controlSize(.small).frame(width: 22, height: 22)
+        } else if updater.updateAvailable {
+            Button {
+                Task { await updater.install(beforeQuit: { model.flush() }) }
+            } label: {
+                FooterIcon(symbol: "arrow.down.circle.fill", color: Theme.accent)
             }
-        } label: {
-            Image(systemName: "arrow.down.circle")
-                .overlay(alignment: .topTrailing) {
-                    if updater.updateAvailable {
-                        Circle().fill(Theme.accent).frame(width: 6, height: 6).offset(x: 2, y: -2)
-                    }
-                }
+            .buttonStyle(.borderless)
+            .help("Install update")
+            .transition(.scale.combined(with: .opacity))
         }
-        .buttonStyle(.borderless)
-        .disabled(updater.state == .checking || updater.state == .installing)
-        .help(updater.updateAvailable ? "Install update" : "Check for updates")
     }
 }

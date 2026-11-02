@@ -29,6 +29,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         if CommandLine.arguments.contains("--selftest") {
             exit(SelfTest.run() ? 0 : 1)
         }
+        if CommandLine.arguments.contains("--uninstall-dry-run") {
+            Uninstaller.uninstall(keepHistory: !CommandLine.arguments.contains("--delete-history"), dryRun: true)
+            exit(0)
+        }
 
         do {
             DecibelStore.migrateLegacyDirectory()
