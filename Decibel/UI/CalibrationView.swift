@@ -39,50 +39,57 @@ struct CalibrationPage: View {
         VStack(spacing: 0) {
             PageHeader(title: "Calibrate Device")
             Divider()
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 18) {
                     HStack(spacing: 10) {
                         DeviceIcon(symbol: profile?.symbol ?? "speaker.wave.2.fill", size: 32)
                         VStack(alignment: .leading, spacing: 0) {
                             Text(profile?.name ?? "No output device").font(.headline)
-                            Text(model.volume.muted ? "Muted" : "Volume \(Int((model.volume.scalar * 100).rounded()))%"
-                                 + (volumeDB.map { String(format: " (%.1f dB)", $0) } ?? ""))
+                            Text(model.volume.muted ? "Muted" : "Volume \(Int((model.volume.scalar * 100).rounded()))%")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        step(1, "Set the volume you normally listen at.")
-                        step(2, "Play pink noise (−20 dBFS). Start at a moderate volume.")
+                    VStack(alignment: .leading, spacing: 14) {
+                        step(1, model.volume.isSilent
+                             ? "Turn the sound on and set the volume to where you usually listen."
+                             : "Set the volume to where you usually listen.")
+                        step(2, "Press Play Test Sound below. You'll hear a steady hiss.")
                         step(3, profile?.kind == .headphones
-                             ? "Measure the level at the ear (e.g. iPhone Health headphone level, or an SPL meter)."
-                             : "Measure at your listening position with Apple Watch Noise or an SPL meter app (dB A).")
-                        step(4, "Enter the reading and save. Later volume changes are handled automatically.")
+                             ? "Open a sound meter app on your phone and place one ear cup over the phone's microphone."
+                             : "Open the Noise app on your Apple Watch, or a sound meter app on your phone, and hold it where your head usually is.")
+                        step(4, "Type in the number it shows and press Save.")
                     }
                     .font(.callout)
 
                     Card {
                         Button { toggle() } label: {
-                            Label(playing ? "Stop Pink Noise" : "Play Pink Noise", systemImage: playing ? "stop.fill" : "play.fill")
+                            Label(playing ? "Stop Test Sound" : "Play Test Sound", systemImage: playing ? "stop.fill" : "play.fill")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent).tint(Theme.accent)
                         .controlSize(.large)
 
                         HStack {
-                            Text("Measured level")
+                            Text("The meter shows")
                             Spacer()
-                            TextField("dB(A)", value: $measured, format: .number.precision(.fractionLength(0...1)))
+                            TextField("72", value: $measured, format: .number.precision(.fractionLength(0...1)))
                                 .textFieldStyle(.roundedBorder)
                                 .frame(width: 70)
                                 .multilineTextAlignment(.trailing)
-                            Text("dB(A)").foregroundStyle(.secondary)
+                            Text("dB").foregroundStyle(.secondary)
                         }
 
                         if let p = profile, let n = noiseLevel, let v = volumeDB {
                             Divider()
-                            row("Current estimate", String(format: "%.1f dB", n + v + p.offset))
-                            row("Offset", measured.map { String(format: "%.1f → %.1f dB", p.offset, $0 - (n + v)) }
-                                ?? String(format: "%.1f dB", p.offset))
+                            let estimate = n + v + p.offset
+                            row("Decibel estimates", String(format: "%.0f dB", estimate))
+                            if let m = measured {
+                                let change = m - estimate
+                                Text(abs(change) < 0.5
+                                     ? "That matches. Nothing to change."
+                                     : String(format: "Decibel will %@ its estimates by %.0f dB.", change > 0 ? "raise" : "lower", abs(change)))
+                                    .font(.callout).foregroundStyle(.secondary)
+                            }
                         }
                     }
 
@@ -142,7 +149,7 @@ struct CalibrationPage: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text("\(n)").font(.caption2.weight(.bold)).foregroundStyle(.white)
                 .frame(width: 16, height: 16).background(Theme.accent, in: Circle())
-            Text(text).fixedSize(horizontal: false, vertical: true)
+            Text(text).lineSpacing(2).fixedSize(horizontal: false, vertical: true)
         }
     }
 

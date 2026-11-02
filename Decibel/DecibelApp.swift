@@ -63,6 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             if let r = args.firstIndex(of: "--range"), r + 1 < args.count, let range = TimeRange(rawValue: args[r + 1]) {
                 model.range = range
             }
+            if args.contains("--page"), args.contains("calibrate") { model.page = .calibrate }
             model.reloadStats()
             // Stand-in for the popover material, which ImageRenderer can't draw.
             let renderer = ImageRenderer(content: PanelView().environment(model)
