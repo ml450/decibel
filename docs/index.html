@@ -52,9 +52,14 @@
   .meta { color: var(--muted); font-size: 14px; margin-top: 22px; }
 
   .shot { display: flex; justify-content: center; padding: 100px 0 160px; perspective: 1600px; }
-  .shot img { width: min(340px, 80vw); border-radius: 18px; border: 1px solid rgba(255,255,255,.08);
-              transform: rotateX(12deg); transform-origin: 50% 0;
-              box-shadow: 0 60px 120px rgba(77,115,247,.18), 0 30px 60px rgba(0,0,0,.6); }
+  /* The screenshot tilts toward the pointer (see script); --rx/--ry/--gx/--gy are set from JS. */
+  .tilt { position: relative; width: min(340px, 80vw); border-radius: 18px;
+          transform: rotateX(var(--rx, 10deg)) rotateY(var(--ry, 0deg)); will-change: transform;
+          box-shadow: calc(var(--sx, 0) * 1px) 60px 120px rgba(77,115,247,.18),
+                      calc(var(--sx, 0) * .5px) 30px 60px rgba(0,0,0,.6); }
+  .tilt img { display: block; width: 100%; height: auto; border-radius: 18px; border: 1px solid rgba(255,255,255,.08); }
+  .glare { position: absolute; inset: 0; border-radius: 18px; pointer-events: none;
+           background: radial-gradient(circle at var(--gx, 50%) var(--gy, 0%), rgba(255,255,255,.10), transparent 55%); }
 
   .points { display: grid; grid-template-columns: repeat(3, 1fr); gap: 48px; text-align: center; }
   .points svg { width: 28px; height: 28px; color: var(--accent-hover); }
@@ -103,7 +108,7 @@
   <p class="meta" id="meta">macOS 14 Sonoma eller nyere · Apple silicon</p>
 </header>
 
-<div class="shot"><img src="panel.png" alt="Decibel-panelet: live nivå, snitt per dag, ukesdose og enheter" width="340"></div>
+<div class="shot"><div class="tilt" id="tilt"><img src="panel.png" alt="Decibel-panelet: live nivå, snitt per dag, ukesdose og enheter" width="340" height="514"><div class="glare"></div></div></div>
 
 <section class="wrap points">
   <div>
@@ -152,6 +157,32 @@
       setTimeout(() => (e.target.textContent = 'Kopier'), 1600);
     } catch { /* clipboard blocked: the text is still selectable */ }
   });
+
+  // The screenshot leans toward the pointer, eased so it glides rather than snaps.
+  (() => {
+    const tilt = document.getElementById('tilt');
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches || !matchMedia('(hover: hover)').matches;
+    if (still) return;
+    let target = { x: 0, y: 0 }, now = { x: 0, y: 0 };
+    const clamp = (v) => Math.max(-1, Math.min(1, v));
+    addEventListener('pointermove', (e) => {
+      const r = tilt.getBoundingClientRect();
+      target.x = clamp((e.clientX - (r.left + r.width / 2)) / (innerWidth / 2));
+      target.y = clamp((e.clientY - (r.top + r.height / 2)) / (innerHeight / 2));
+    });
+    document.addEventListener('pointerleave', () => { target = { x: 0, y: 0 }; });
+    (function frame() {
+      now.x += (target.x - now.x) * 0.08;
+      now.y += (target.y - now.y) * 0.08;
+      const s = tilt.style;
+      s.setProperty('--ry', (now.x * 14).toFixed(2) + 'deg');
+      s.setProperty('--rx', (10 - now.y * 10).toFixed(2) + 'deg');
+      s.setProperty('--sx', (-now.x * 40).toFixed(1));
+      s.setProperty('--gx', (50 + now.x * 40).toFixed(1) + '%');
+      s.setProperty('--gy', (20 + now.y * 40).toFixed(1) + '%');
+      requestAnimationFrame(frame);
+    })();
+  })();
 
   // Version and size come from the latest GitHub release, so the page never goes stale.
   (async () => {
