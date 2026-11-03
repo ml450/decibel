@@ -122,7 +122,7 @@ struct ThinSlider: View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.secondary.opacity(0.25))
-                Capsule().fill(Theme.accent).frame(width: max(4, geo.size.width * fraction))
+                Capsule().fill(Theme.accent).frame(width: fraction > 0 ? max(4, geo.size.width * fraction) : 0)
             }
             .frame(height: 4)
             .overlay(alignment: .leading) {

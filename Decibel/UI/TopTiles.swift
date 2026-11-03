@@ -59,40 +59,50 @@ struct NowPlayingTile: View {
     @Environment(AppModel.self) private var model
     static let topRow: CGFloat = 36
 
+    /// Always shown, so the panel keeps its layout when Spotify or Music closes; empty state when idle.
     var body: some View {
         let np = model.nowPlaying
-        if let track = np.track {
-            Card {
-                HStack(alignment: .center, spacing: 0) {
-                    artwork(np.artwork)
-                    // Centred between the cover and the card's wall (the card's 12 pt padding included),
-                    // and between the card's top and the title, which is the cover's centre line.
-                    controls(np, playing: track.isPlaying)
-                        .frame(maxWidth: .infinity)
-                        .offset(x: 6, y: -1)
-                }
-                .frame(height: Self.topRow)   // same as the device tile, so the titles line up
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(track.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
-                    Text(track.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                }
-                Spacer(minLength: 0)
+        let track = np.track
+        Card {
+            HStack(alignment: .center, spacing: 0) {
+                artwork(track == nil ? nil : np.artwork, idle: track == nil)
+                // Centred between the cover and the card's wall (the card's 12 pt padding included),
+                // and between the card's top and the title, which is the cover's centre line.
+                controls(np, playing: track?.isPlaying ?? false)
+                    .disabled(track == nil)
+                    .opacity(track == nil ? 0.3 : 1)
+                    .frame(maxWidth: .infinity)
+                    .offset(x: 6, y: -1)
+            }
+            .frame(height: Self.topRow)   // same as the device tile, so the titles line up
+            VStack(alignment: .leading, spacing: 1) {
+                Text(track?.title ?? "Not playing")
+                    .font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                    .foregroundStyle(track == nil ? .secondary : .primary)
+                Text(track?.artist ?? "Spotify or Music")
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            if let track {
                 TimelineView(.periodic(from: .now, by: 0.5)) { context in
                     let progress = track.duration > 0 ? track.position(at: context.date) / track.duration : 0
                     ThinSlider(value: progress, onEnd: { np.seek(to: $0 * track.duration) })
                 }
+            } else {
+                ThinSlider(value: 0).disabled(true).opacity(0.5)
             }
         }
     }
 
-    private func artwork(_ image: NSImage?) -> some View {
+    private func artwork(_ image: NSImage?, idle: Bool) -> some View {
         Group {
             if let image {
                 Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
             } else {
                 ZStack {
-                    Rectangle().fill(Theme.accent.gradient)
-                    Image(systemName: "music.note").font(.system(size: 14, weight: .medium)).foregroundStyle(.white)
+                    Rectangle().fill(idle ? AnyShapeStyle(Color.secondary.opacity(0.18)) : AnyShapeStyle(Theme.accent.gradient))
+                    Image(systemName: "music.note").font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(idle ? Color.secondary : Color.white)
                 }
             }
         }

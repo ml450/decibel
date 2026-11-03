@@ -83,17 +83,12 @@ private struct HomePage: View {
 extension HomePage {
     private var content: some View {
         VStack(spacing: 8) {
-            if model.nowPlaying.track != nil {
-                // Device and player as two matching tiles; same height, same structure.
-                HStack(alignment: .top, spacing: 8) {
-                    DeviceTile().frame(maxHeight: .infinity)
-                    NowPlayingTile().frame(maxHeight: .infinity)
-                        .transition(.opacity.combined(with: .move(edge: .trailing)))
-                }
-                .fixedSize(horizontal: false, vertical: true)
-            } else {
-                NowHeader()
+            // Device and player as two matching tiles, always: the layout never changes when music stops.
+            HStack(alignment: .top, spacing: 8) {
+                DeviceTile().frame(maxHeight: .infinity)
+                NowPlayingTile().frame(maxHeight: .infinity)
             }
+            .fixedSize(horizontal: false, vertical: true)
             if !model.captureState.isHealthy && !model.isSnapshot { CaptureStatusCard() }
             LevelsCard()
             DevicesCard()
@@ -102,56 +97,6 @@ extension HomePage {
         .padding(.top, 10)
         .padding(.bottom, 12)
         .animation(.smooth(duration: 0.3), value: model.nowPlaying.track?.key)
-    }
-}
-
-private struct NowHeader: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        Card {
-            row
-        }
-    }
-
-    private var row: some View {
-        HStack(spacing: 14) {
-            LiveLevel().frame(minWidth: 64, alignment: .leading)
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(model.device?.name ?? "No output device")
-                        .font(.system(size: 13, weight: .semibold)).lineLimit(1)
-                    if model.currentProfile?.calibrated == true {
-                        Image(systemName: "checkmark.seal.fill").font(.caption2).foregroundStyle(Theme.accent)
-                            .help("Calibrated")
-                    }
-                    if model.volume.hasControl {
-                        Spacer(minLength: 6)
-                        // Right-aligned above the end of the slider.
-                        Text(model.volume.muted ? "Muted" : "\(Int((model.volume.scalar * 100).rounded()))%")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                if model.volume.hasControl {
-                    // Volume slider for the current output, live while dragging.
-                    HStack(spacing: 6) {
-                        VolumeButton()
-                        ThinSlider(value: model.volume.muted ? 0 : model.volume.scalar,
-                                   onChange: { model.setVolume($0) })
-                    }
-                } else {
-                    Text(volumeText).font(.caption).foregroundStyle(.secondary)
-                }
-            }
-
-        }
-    }
-
-    private var volumeText: String {
-        let v = model.volume
-        if v.muted { return "Muted" }
-        return v.hasControl ? "Volume \(Int((v.scalar * 100).rounded()))%" : (model.currentProfile?.kind.label ?? "")
     }
 }
 
