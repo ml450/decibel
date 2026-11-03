@@ -83,7 +83,10 @@ private struct ProgressRow: View {
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.secondary.opacity(0.25))
                     Capsule().fill(Theme.accent).frame(width: max(4, geo.size.width * fraction))
-                    // Small glossy knob, only while you hold it.
+                }
+                .frame(height: 4)
+                // Small glossy knob, only while you hold it; an overlay so it never changes the bar's height.
+                .overlay(alignment: .leading) {
                     Circle()
                         .fill(LinearGradient(colors: [.white, Color(white: 0.86)], startPoint: .top, endPoint: .bottom))
                         .overlay(Circle().strokeBorder(.white.opacity(0.6), lineWidth: 0.5))
@@ -93,7 +96,6 @@ private struct ProgressRow: View {
                         .scaleEffect(pressed ? 1 : 0.4)
                         .opacity(pressed ? 1 : 0)
                 }
-                .frame(height: 4)
                 .frame(maxHeight: .infinity)
                 .contentShape(Rectangle())
                 .gesture(
