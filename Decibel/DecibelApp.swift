@@ -56,6 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 model = AppModel(store: demo)
                 model.isSnapshot = true
                 model.applyDemo()
+                model.nowPlaying.applyDemo()
             } else {
                 model.isSnapshot = true
                 model.loadCurrentDevice()
@@ -183,6 +184,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     func popoverDidShow(_ notification: Notification) {
         darkenPopoverGlass()
+        model.nowPlaying.startPolling()
         // `.transient` only closes when macOS notices we lost focus, which doesn't always happen when you
         // click another menu bar item (Control Center, volume…). Close on any click outside us instead.
         outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
@@ -194,6 +196,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     func popoverDidClose(_ notification: Notification) {
+        model.nowPlaying.stopPolling()
         if let outsideClickMonitor { NSEvent.removeMonitor(outsideClickMonitor) }
         outsideClickMonitor = nil
     }

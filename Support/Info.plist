@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Decibel shows what's playing in Spotify and Music, and lets you play, pause and skip from the panel.</string>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>Decibel measures how loud your Mac's audio output is, once per second, to estimate your listening exposure. Audio is never recorded or stored.</string>
 </dict>

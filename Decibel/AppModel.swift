@@ -120,6 +120,7 @@ final class AppModel {
     @ObservationIgnored var setPanelPinned: ((Bool) -> Void)?
     @ObservationIgnored let store: DecibelStore
     @ObservationIgnored let updater = Updater()
+    @ObservationIgnored let nowPlaying = NowPlaying()
     @ObservationIgnored private let capture: SystemAudioSource = {
         if #available(macOS 14.2, *) { return SystemAudioTap() }
         return SystemAudioCapture()

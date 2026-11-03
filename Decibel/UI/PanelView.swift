@@ -91,12 +91,16 @@ extension HomePage {
     private var content: some View {
         VStack(spacing: 8) {
             if !model.captureState.isHealthy && !model.isSnapshot { CaptureStatusCard() }
+            if model.nowPlaying.track != nil {
+                NowPlayingCard().transition(.opacity.combined(with: .move(edge: .top)))
+            }
             LevelsCard()
             DoseCard()
             DevicesCard()
         }
         .padding(.horizontal, 12)
         .padding(.bottom, 12)
+        .animation(.smooth(duration: 0.3), value: model.nowPlaying.track?.key)
     }
 }
 
