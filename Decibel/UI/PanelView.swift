@@ -83,11 +83,18 @@ private struct HomePage: View {
 extension HomePage {
     private var content: some View {
         VStack(spacing: 8) {
-            NowHeader()
-            if !model.captureState.isHealthy && !model.isSnapshot { CaptureStatusCard() }
             if model.nowPlaying.track != nil {
-                NowPlayingCard().transition(.opacity.combined(with: .move(edge: .top)))
+                // Device and player as two matching tiles; same height, same structure.
+                HStack(alignment: .top, spacing: 8) {
+                    DeviceTile().frame(maxHeight: .infinity)
+                    NowPlayingTile().frame(maxHeight: .infinity)
+                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+                }
+                .fixedSize(horizontal: false, vertical: true)
+            } else {
+                NowHeader()
             }
+            if !model.captureState.isHealthy && !model.isSnapshot { CaptureStatusCard() }
             LevelsCard()
             DevicesCard()
         }
@@ -109,7 +116,7 @@ private struct NowHeader: View {
 
     private var row: some View {
         HStack(spacing: 12) {
-            DeviceIcon(symbol: model.currentProfile?.symbol ?? "speaker.wave.2.fill", size: Theme.leadingArt)
+            DeviceIcon(symbol: model.currentProfile?.symbol ?? "speaker.wave.2.fill", size: 36)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(model.device?.name ?? "No output device")
@@ -140,23 +147,9 @@ private struct NowHeader: View {
                     Text(volumeText).font(.caption).foregroundStyle(.secondary)
                 }
             }
-            Group {
-            if let spl = model.liveSPL {
-                HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    Circle().fill(Theme.levelColor(spl)).frame(width: 7, height: 7)
-                        .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
-                    Text(Format.db(spl))
-                        .font(.system(size: 22, weight: .semibold, design: .rounded)).monospacedDigit()
-                        .contentTransition(.numericText())
-                    Text("dB").font(.caption.weight(.medium)).foregroundStyle(.secondary)
-                }
-                .animation(.snappy, value: Int(spl))
-            } else {
-                Text(model.volume.isSilent && model.liveDBFS != nil ? "Muted" : "Silent")
-                    .font(.callout.weight(.medium)).foregroundStyle(.tertiary)
-            }
-            }
-            .frame(width: Theme.trailingColumn, alignment: .trailing)
+            Spacer(minLength: 12)
+            LiveLevel()
+
         }
     }
 

@@ -2,9 +2,6 @@ import AppKit
 import SwiftUI
 
 enum Theme {
-    /// Shared columns for the top two cards (device and Now Playing), so they line up.
-    static let leadingArt: CGFloat = 56
-    static let trailingColumn: CGFloat = 92
 
     /// Accent colour (Health app "Hearing" blue).
     static let accent = Color(red: 0.30, green: 0.45, blue: 0.97)
