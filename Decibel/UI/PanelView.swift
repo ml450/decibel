@@ -76,20 +76,14 @@ private struct HomePage: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        VStack(spacing: 0) {
-            NowHeader()
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
-                .padding(.bottom, 12)
-
-            content
-        }
+        content
     }
 }
 
 extension HomePage {
     private var content: some View {
         VStack(spacing: 8) {
+            NowHeader()
             if !model.captureState.isHealthy && !model.isSnapshot { CaptureStatusCard() }
             if model.nowPlaying.track != nil {
                 NowPlayingCard().transition(.opacity.combined(with: .move(edge: .top)))
@@ -98,6 +92,7 @@ extension HomePage {
             DevicesCard()
         }
         .padding(.horizontal, 12)
+        .padding(.top, 10)
         .padding(.bottom, 12)
         .animation(.smooth(duration: 0.3), value: model.nowPlaying.track?.key)
     }
@@ -107,9 +102,15 @@ private struct NowHeader: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        HStack(spacing: 10) {
-            DeviceIcon(symbol: model.currentProfile?.symbol ?? "speaker.wave.2.fill", size: 28)
-            VStack(alignment: .leading, spacing: 0) {
+        Card {
+            row
+        }
+    }
+
+    private var row: some View {
+        HStack(spacing: 12) {
+            DeviceIcon(symbol: model.currentProfile?.symbol ?? "speaker.wave.2.fill", size: 32)
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 4) {
                     Text(model.device?.name ?? "No output device")
                         .font(.system(size: 13, weight: .semibold)).lineLimit(1)
@@ -131,13 +132,12 @@ private struct NowHeader: View {
                             .foregroundStyle(.secondary)
                             .frame(width: 38, alignment: .leading)
                     }
-                    .frame(maxWidth: 190)
                     .help("Volume")
                 } else {
                     Text(volumeText).font(.caption).foregroundStyle(.secondary)
                 }
             }
-            Spacer(minLength: 8)
+            Spacer(minLength: 12)
             if let spl = model.liveSPL {
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
                     Circle().fill(Theme.levelColor(spl)).frame(width: 7, height: 7)
@@ -153,6 +153,7 @@ private struct NowHeader: View {
                     .font(.callout.weight(.medium)).foregroundStyle(.tertiary)
             }
         }
+        .frame(minHeight: 36)
     }
 
     private var volumeText: String {
