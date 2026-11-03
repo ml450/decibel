@@ -41,8 +41,24 @@ final class AppModel {
     // Loudness (LUFS) measurement for delivery checks
     private(set) var loudness: LoudnessReading?
     private(set) var loudnessRunning = false
-    var loudnessTarget: LoudnessTarget = LoudnessTarget(rawValue: UserDefaults.standard.string(forKey: "loudnessTarget") ?? "") ?? .streaming {
-        didSet { UserDefaults.standard.set(loudnessTarget.rawValue, forKey: "loudnessTarget") }
+    var loudnessTarget = LoudnessTarget(storageKey: UserDefaults.standard.string(forKey: "loudnessTarget")) {
+        didSet { UserDefaults.standard.set(loudnessTarget.storageKey, forKey: "loudnessTarget") }
+    }
+    /// Saved custom targets (LUFS), newest last.
+    private(set) var customTargets: [Double] = UserDefaults.standard.array(forKey: "customLUFSTargets") as? [Double] ?? [] {
+        didSet { UserDefaults.standard.set(customTargets, forKey: "customLUFSTargets") }
+    }
+    var targetLUFS: Double { loudnessTarget.lufs }
+
+    func addCustomTarget(_ lufs: Double) {
+        let value = (min(0, max(-40, lufs)) * 10).rounded() / 10
+        if !customTargets.contains(value) { customTargets.append(value) }
+        loudnessTarget = .custom(value)
+    }
+
+    func removeCustomTarget(_ lufs: Double) {
+        customTargets.removeAll { $0 == lufs }
+        if loudnessTarget == .custom(lufs) { loudnessTarget = .social }
     }
 
     /// The coloured level next to the ear in the menu bar (some find it distracting).

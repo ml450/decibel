@@ -6,6 +6,8 @@ struct PanelView: View {
     static let width: CGFloat = 360
 
     @Environment(AppModel.self) private var model
+    /// Height of the Hearing tab; the Loudness tab takes the same, so switching never resizes the panel.
+    @State private var hearingHeight: CGFloat?
 
     /// Same soft fade-and-scale as the popover opening.
     private static let pageTransition = AnyTransition.opacity.combined(with: .scale(scale: 0.96, anchor: .top))
@@ -17,15 +19,16 @@ struct PanelView: View {
                 // The two tabs share the tab bar and footer; only their content changes.
                 VStack(spacing: 0) {
                     PanelTabs()
+                        .padding(.horizontal, 12)
                         .padding(.top, 12)
                         .padding(.bottom, 2)
+                    // Both tabs stay laid out, so the panel keeps the taller one's height and never
+                    // jumps when switching; they crossfade with a short slide instead.
                     ZStack(alignment: .top) {
-                        if model.page == .home {
-                            HomePage().transition(.opacity)
-                        } else {
-                            LoudnessTab().transition(.opacity)
-                        }
+                        tab(HomePage().onHeightChange { hearingHeight = $0 }, selected: model.page == .home, from: -1)
+                        tab(LoudnessTab().frame(height: hearingHeight), selected: model.page == .loudness, from: 1)
                     }
+                    .animation(.smooth(duration: 0.3), value: model.page)
                     Divider()
                     FooterBar()
                 }
@@ -42,6 +45,28 @@ struct PanelView: View {
         .frame(width: Self.width)
         .fixedSize(horizontal: false, vertical: true)
         // No background of our own: the popover's material (arrow included) shows through as one surface.
+    }
+}
+
+extension PanelView {
+    private func tab(_ content: some View, selected: Bool, from side: CGFloat) -> some View {
+        content
+            .opacity(selected ? 1 : 0)
+            .offset(x: selected ? 0 : side * 24)
+            .allowsHitTesting(selected)
+            .accessibilityHidden(!selected)
+    }
+}
+
+private struct HeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+private extension View {
+    func onHeightChange(_ action: @escaping (CGFloat) -> Void) -> some View {
+        background(GeometryReader { Color.clear.preference(key: HeightKey.self, value: $0.size.height) })
+            .onPreferenceChange(HeightKey.self, perform: action)
     }
 }
 

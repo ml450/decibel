@@ -25,8 +25,8 @@ struct PanelTabs: View {
         }
         .font(.system(size: 12, weight: .semibold))
         .foregroundStyle(selected ? Color.white : Color.secondary)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 5)
         .background {
             if selected { Capsule().fill(Theme.accent).matchedGeometryEffect(id: "pill", in: pill) }
         }
@@ -40,25 +40,27 @@ struct LoudnessTab: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        @Bindable var model = model
         let r = model.loudness
         let target = model.loudnessTarget
+        let goal = model.targetLUFS
 
         VStack(alignment: .leading, spacing: 10) {
-            Picker("Target", selection: $model.loudnessTarget) {
-                ForEach(LoudnessTarget.allCases) { Text($0.label).tag($0) }
-            }
-            .labelsHidden()
-            .frame(maxWidth: .infinity)
+            TargetMenu()
 
             Card {
                 HStack(alignment: .top, spacing: 0) {
-                    HStack(alignment: .top, spacing: 12) {
-                        MeterScale(target: target.lufs)
-                        MeterBar(label: "M", value: r?.momentary, target: target.lufs)
-                        MeterBar(label: "S", value: r?.shortTerm, target: target.lufs)
-                        MeterBar(label: "TP", value: r?.truePeak, target: nil, ceiling: -1)
+                    // The bars take whatever height the tab has to spare.
+                    GeometryReader { geo in
+                        let barHeight = max(120, geo.size.height - Meter.labelHeight)
+                        HStack(alignment: .top, spacing: 12) {
+                            MeterScale(target: goal, height: barHeight)
+                            MeterBar(label: "M", value: r?.momentary, target: goal, height: barHeight)
+                            MeterBar(label: "S", value: r?.shortTerm, target: goal, height: barHeight)
+                            MeterBar(label: "TP", value: r?.truePeak, target: nil, ceiling: -1, height: barHeight)
+                        }
                     }
+                    .frame(width: 22 + 3 * 16 + 3 * 12)
+                    .frame(minHeight: 212)
                     Spacer(minLength: 16)
                     VStack(alignment: .leading, spacing: 9) {
                         stat("Short", r?.shortTerm)
@@ -70,18 +72,19 @@ struct LoudnessTab: View {
                             Text(r?.integrated.map(Self.number) ?? "–")
                                 .font(.system(size: 26, weight: .semibold, design: .rounded))
                                 .monospacedDigit()
-                                .foregroundStyle(r?.integrated.map { Self.color($0 - target.lufs) } ?? .primary)
+                                .foregroundStyle(r?.integrated.map { Self.color($0 - goal) } ?? .primary)
                                 .contentTransition(.numericText())
                         }
                     }
                     .frame(width: 92, alignment: .leading)
                 }
-                Text(verdict(r, target))
+                Text(verdict(r, target, goal))
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
             }
+            .frame(maxHeight: .infinity)
 
             HStack(spacing: 10) {
                 Button {
@@ -124,19 +127,19 @@ struct LoudnessTab: View {
         }
     }
 
-    private func verdict(_ r: LoudnessReading?, _ target: LoudnessTarget) -> String {
+    private func verdict(_ r: LoudnessReading?, _ target: LoudnessTarget, _ goal: Double) -> String {
         guard let r else { return "Not measured yet." }
         guard let integrated = r.integrated else {
             return model.loudnessRunning ? "Listening… values appear after a few seconds of sound." : "No sound measured."
         }
-        let diff = integrated - target.lufs
+        let diff = integrated - goal
         let time = " (\(Self.duration(r.seconds)))"
-        if abs(diff) < 1 { return "On target for \(target.name)." + time }
+        if abs(diff) < 1 { return "On target." + time }
         let amount = String(format: "%.1f", abs(diff))
-        let goal = Self.number(target.lufs).replacingOccurrences(of: ".0", with: "")
+        let goalText = Self.number(goal).replacingOccurrences(of: ".0", with: "")
         return (diff > 0
-            ? "\(amount) LU louder than \(goal) LUFS. \(target.name) will turn it down."
-            : "\(amount) LU quieter than \(goal) LUFS.") + time
+            ? "\(amount) LU louder than \(goalText) LUFS.\(target.tooLoudNote)"
+            : "\(amount) LU quieter than \(goalText) LUFS.") + time
     }
 
     /// Green within ±1 LU of the target, yellow within ±2, orange beyond.
@@ -155,12 +158,11 @@ struct LoudnessTab: View {
 }
 
 /// Shared scale for the meter bars: −60 to 0.
-private enum Meter {
+enum Meter {
     static let range: ClosedRange<Double> = -60...0
-    static let height: CGFloat = 196
     static let labelHeight: CGFloat = 16
 
-    static func y(_ value: Double) -> CGFloat {
+    static func y(_ value: Double, _ height: CGFloat) -> CGFloat {
         let v = min(max(value, range.lowerBound), range.upperBound)
         return height * CGFloat((v - range.lowerBound) / (range.upperBound - range.lowerBound))
     }
@@ -168,6 +170,7 @@ private enum Meter {
 
 private struct MeterScale: View {
     let target: Double
+    let height: CGFloat
 
     var body: some View {
         VStack(spacing: 0) {
@@ -175,13 +178,13 @@ private struct MeterScale: View {
             ZStack(alignment: .bottomTrailing) {
                 Color.clear
                 ForEach([0, -10, -20, -30, -40, -50, -60] + [target], id: \.self) { v in
-                    Text(LoudnessTab.number(v).replacingOccurrences(of: ".0", with: ""))
+                    Text(LoudnessTarget.format(v))
                         .font(.system(size: 9, weight: v == target ? .bold : .regular).monospacedDigit())
                         .foregroundStyle(v == target ? Color.primary : Color.secondary)
-                        .offset(y: -Meter.y(v) + 5)
+                        .offset(y: -Meter.y(v, height) + 5)
                 }
             }
-            .frame(width: 22, height: Meter.height)
+            .frame(width: 22, height: height)
         }
     }
 }
@@ -192,6 +195,7 @@ private struct MeterBar: View {
     let value: Double?
     let target: Double?
     var ceiling: Double? = nil
+    let height: CGFloat
 
     var body: some View {
         VStack(spacing: 0) {
@@ -203,14 +207,14 @@ private struct MeterBar: View {
                 RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.15))
                 RoundedRectangle(cornerRadius: 3)
                     .fill(color)
-                    .frame(height: value.map(Meter.y) ?? 0)
+                    .frame(height: value.map { Meter.y($0, height) } ?? 0)
                     .animation(.linear(duration: 0.1), value: value)
                 if let target {
                     Rectangle().fill(Color.primary.opacity(0.7)).frame(height: 1)
-                        .offset(y: -Meter.y(target))
+                        .offset(y: -Meter.y(target, height))
                 }
             }
-            .frame(width: 16, height: Meter.height)
+            .frame(width: 16, height: height)
         }
     }
 
@@ -219,5 +223,59 @@ private struct MeterBar: View {
         if let ceiling { return value > ceiling ? Theme.loud : Theme.accent }
         guard let target else { return Theme.accent }
         return value > target + 1 ? Theme.loud : value >= target - 1 ? .green : Theme.accent
+    }
+}
+
+/// Target picker with saved custom targets: add them with a value, remove them from a submenu.
+private struct TargetMenu: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Menu {
+            ForEach(LoudnessTarget.builtIn, id: \.self) { option($0) }
+            if !model.customTargets.isEmpty {
+                Divider()
+                ForEach(model.customTargets, id: \.self) { option(.custom($0)) }
+            }
+            Divider()
+            Button("Add Custom Target…") { addCustom() }
+            if !model.customTargets.isEmpty {
+                Menu("Remove Custom Target") {
+                    ForEach(model.customTargets, id: \.self) { value in
+                        Button("\(LoudnessTarget.format(value)) LUFS") { model.removeCustomTarget(value) }
+                    }
+                }
+            }
+        } label: {
+            Text(model.loudnessTarget.label)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func option(_ target: LoudnessTarget) -> some View {
+        Toggle(target.label, isOn: Binding(get: { model.loudnessTarget == target },
+                                           set: { if $0 { model.loudnessTarget = target } }))
+    }
+
+    private func addCustom() {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Custom loudness target"
+        alert.informativeText = "Enter the integrated loudness to aim for, in LUFS (for example −16)."
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 120, height: 24))
+        field.placeholderString = "−16"
+        alert.accessoryView = field
+        alert.addButton(withTitle: "Add")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let text = field.stringValue
+            .replacingOccurrences(of: "−", with: "-")
+            .replacingOccurrences(of: ",", with: ".")
+            .replacingOccurrences(of: "LUFS", with: "", options: .caseInsensitive)
+            .trimmingCharacters(in: .whitespaces)
+        guard var value = Double(text) else { return }
+        if value > 0 { value = -value }   // "16" means −16
+        model.addCustomTarget(value)
     }
 }

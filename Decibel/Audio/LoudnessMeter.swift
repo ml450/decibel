@@ -195,34 +195,58 @@ struct TruePeakOversampler {
     }
 }
 
-/// Delivery targets for the loudness meter.
-enum LoudnessTarget: String, CaseIterable, Identifiable {
-    case streaming = "youtube", appleMusic, broadcast
+/// Delivery targets for the loudness meter: two built-ins plus the user's saved custom values.
+enum LoudnessTarget: Hashable {
+    case social, broadcast, custom(Double)
 
-    var id: String { rawValue }
+    static let builtIn: [LoudnessTarget] = [.social, .broadcast]
 
     var lufs: Double {
         switch self {
-        case .streaming: -14
-        case .appleMusic: -16
+        case .social: -14
         case .broadcast: -23
-        }
-    }
-
-    /// Who will turn it down, for the verdict sentence.
-    var name: String {
-        switch self {
-        case .streaming: "YouTube"
-        case .appleMusic: "Apple Music"
-        case .broadcast: "Broadcast"
+        case .custom(let v): v
         }
     }
 
     var label: String {
+        let value = LoudnessTarget.format(lufs)
         switch self {
-        case .streaming: "−14 LUFS · YouTube, Spotify, social"
-        case .appleMusic: "−16 LUFS · Apple Music"
-        case .broadcast: "−23 LUFS · Broadcast (EBU R128)"
+        case .social: return "\(value) LUFS · Social media"
+        case .broadcast: return "\(value) LUFS · Broadcast (EBU R128)"
+        case .custom: return "\(value) LUFS · Custom"
+        }
+    }
+
+    /// Follows "N LU louder than …" in the verdict.
+    var tooLoudNote: String {
+        switch self {
+        case .social: " YouTube and the others will turn it down."
+        case .broadcast: " Too loud for broadcast."
+        case .custom: ""
+        }
+    }
+
+    /// "−14", "−16.5"
+    static func format(_ v: Double) -> String {
+        (v == v.rounded() ? String(format: "%.0f", v) : String(format: "%.1f", v)).replacingOccurrences(of: "-", with: "−")
+    }
+
+    // Stored as "social", "broadcast" or "custom:-16.0" ("youtube" was the old name for social).
+    var storageKey: String {
+        switch self {
+        case .social: "social"
+        case .broadcast: "broadcast"
+        case .custom(let v): "custom:\(v)"
+        }
+    }
+
+    init(storageKey: String?) {
+        switch storageKey {
+        case "broadcast": self = .broadcast
+        case let key? where key.hasPrefix("custom:"):
+            self = Double(key.dropFirst(7)).map { .custom($0) } ?? .social
+        default: self = .social
         }
     }
 }
