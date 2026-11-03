@@ -13,12 +13,22 @@ enum DeviceKind: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Estimated dB(A) SPL for a 0 dBFS signal at maximum volume.
+    /// Estimated dB(A) SPL for a 0 dBFS signal at maximum volume. Typical mastered music sits about
+    /// 15 dB below that, so speakers playing music at max land around 80 (MacBook, ~50 cm) and 85 dB.
     var defaultOffset: Double {
         switch self {
-        case .macSpeakers: 80      // MacBook speakers at ~50 cm
-        case .headphones: 100      // AirPods / Sony WH-1000XM5 class
-        case .externalSpeakers: 85 // unknown speakers
+        case .macSpeakers: 95       // music at max ≈ 80 dB at ~50 cm
+        case .headphones: 100       // AirPods / Sony WH-1000XM5 class, full scale at max
+        case .externalSpeakers: 100 // music at max ≈ 85 dB
+        }
+    }
+
+    /// Defaults from versions before 1.3, so uncalibrated profiles can be moved to the new ones.
+    var previousDefaultOffset: Double {
+        switch self {
+        case .macSpeakers: 80
+        case .headphones: 100
+        case .externalSpeakers: 85
         }
     }
 

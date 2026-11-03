@@ -1,6 +1,7 @@
 import AppKit
 
-/// Menu bar item: just the ear while it's quiet; the level fades and slides in beside it when sound plays.
+/// Menu bar item: just the ear while it's quiet; the level fades and slides out to the left of it when
+/// sound plays. Status items grow to the left, so keeping the ear on the right means it never moves.
 /// The ear and number are our own subviews so the width and text can be animated.
 @MainActor
 final class StatusItemController {
@@ -23,12 +24,13 @@ final class StatusItemController {
         image?.isTemplate = true
         icon.image = image
         icon.imageScaling = .scaleNone
-        icon.frame = NSRect(x: 0, y: 0, width: iconWidth, height: button.bounds.height)
-        icon.autoresizingMask = [.height]
+        icon.frame = NSRect(x: button.bounds.width - iconWidth, y: 0, width: iconWidth, height: button.bounds.height)
+        icon.autoresizingMask = [.height, .minXMargin]   // pinned to the right edge
         button.addSubview(icon)
 
         label.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
         label.alphaValue = 0
+        label.autoresizingMask = [.minXMargin]              // stays next to the ear as the item widens
         button.addSubview(label)
     }
 
@@ -36,64 +38,51 @@ final class StatusItemController {
     func update(text: String?, color: NSColor, toolTip: String) {
         item.button?.toolTip = toolTip
         guard let text else {
-            if visible { hide() }
+            if visible { reveal(false) }
             return
         }
         let widthChanged = text.count != label.stringValue.count
         label.stringValue = text
         label.textColor = color
         if !visible {
-            show()
+            reveal(true)
         } else if widthChanged {
+            item.length = expandedLength
             layoutLabel(offset: 0)
-            animateLength(to: expandedLength, duration: 0.15)
         }
     }
 
-    private var expandedLength: CGFloat { iconWidth + ceil(label.intrinsicContentSize.width) + 4 }
+    private var expandedLength: CGFloat { iconWidth + ceil(label.intrinsicContentSize.width) + 2 }
 
+    /// 0 = only the ear, 1 = number fully shown.
+    private var revealed: CGFloat = 0
+
+    /// Right-aligned against the ear; `offset` > 0 tucks it towards (behind) the ear.
     private func layoutLabel(offset: CGFloat) {
         guard let button = item.button else { return }
         let size = label.intrinsicContentSize
-        label.frame = NSRect(x: iconWidth - 4 + offset, y: (button.bounds.height - size.height) / 2,
-                             width: ceil(size.width) + 2, height: size.height)
+        let width = ceil(size.width) + 2
+        label.frame = NSRect(x: button.bounds.width - iconWidth + 2 - width + offset,
+                             y: (button.bounds.height - size.height) / 2, width: width, height: size.height)
     }
 
-    private func show() {
-        visible = true
-        layoutLabel(offset: -slide)
-        animateLength(to: expandedLength, duration: 0.25)
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.3
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            label.animator().alphaValue = 1
-            label.animator().setFrameOrigin(NSPoint(x: iconWidth - 4, y: label.frame.origin.y))
-        }
-    }
-
-    private func hide() {
-        visible = false
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.2
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            label.animator().alphaValue = 0
-            label.animator().setFrameOrigin(NSPoint(x: iconWidth - 4 - slide, y: label.frame.origin.y))
-        }
-        animateLength(to: iconWidth, duration: 0.25, delay: 0.1)
-    }
-
-    /// NSStatusItem.length isn't animatable, so tween it by hand.
-    private func animateLength(to target: CGFloat, duration: TimeInterval, delay: TimeInterval = 0) {
+    /// One timer drives the item width, the number's slide and its fade together, so they stay in step.
+    /// NSStatusItem.length isn't animatable, hence the manual tween.
+    private func reveal(_ show: Bool) {
+        visible = show
         lengthTimer?.invalidate()
-        let start = item.length
-        guard abs(start - target) > 0.5 else { item.length = target; return }
-        let begin = Date().addingTimeInterval(delay)
+        let from = revealed, to: CGFloat = show ? 1 : 0
+        let duration = show ? 0.28 : 0.22
+        let begin = Date()
         lengthTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { [weak self] timer in
             MainActor.assumeIsolated {
                 guard let self else { timer.invalidate(); return }
-                let t = min(1, max(0, Date().timeIntervalSince(begin) / duration))
-                let eased = 1 - pow(1 - t, 3)   // ease-out cubic
-                self.item.length = start + (target - start) * eased
+                let t = min(1, Date().timeIntervalSince(begin) / duration)
+                let eased = CGFloat(show ? 1 - pow(1 - t, 3) : t * t * t)   // ease-out in, ease-in out
+                self.revealed = from + (to - from) * eased
+                self.item.length = self.iconWidth + (self.expandedLength - self.iconWidth) * self.revealed
+                self.label.alphaValue = self.revealed
+                self.layoutLabel(offset: self.slide * (1 - self.revealed))
                 if t >= 1 { timer.invalidate() }
             }
         }

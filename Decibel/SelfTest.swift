@@ -50,7 +50,7 @@ enum SelfTest {
         let profile = DeviceProfile.automatic(for: OutputDevice(id: 0, uid: "test-airpods", name: "AirPods Pro", transport: .bluetooth))
         check("AirPods default profile", profile.kind == .headphones && profile.offset == 100, "\(profile.kind.label), \(profile.offset) dB")
         let mac = DeviceProfile.automatic(for: OutputDevice(id: 0, uid: "mac", name: "MacBook Pro Speakers", transport: .builtIn))
-        check("Mac speakers default profile", mac.kind == .macSpeakers && mac.offset == 80, "\(mac.kind.label), \(mac.offset) dB")
+        check("Mac speakers default profile", mac.kind == .macSpeakers && mac.offset == 95, "\(mac.kind.label), \(mac.offset) dB")
         let xm5 = DeviceProfile.automatic(for: OutputDevice(id: 0, uid: "xm5", name: "WH-1000XM5", transport: .bluetooth))
         check("XM5 default profile", xm5.kind == .headphones && xm5.offset == 100, "\(xm5.kind.label), \(xm5.offset) dB")
         let spl = -23.0 + (-10.0) + profile.offset

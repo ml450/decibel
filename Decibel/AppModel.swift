@@ -157,6 +157,13 @@ final class AppModel {
     init(store: DecibelStore) {
         self.store = store
         profiles = Dictionary(uniqueKeysWithValues: ((try? store.devices()) ?? []).map { ($0.uid, $0) })
+        // Speaker defaults used to describe music rather than full scale; move untouched profiles over.
+        for var p in profiles.values where !p.calibrated && p.offset == p.kind.previousDefaultOffset
+            && p.offset != p.kind.defaultOffset {
+            p.offset = p.kind.defaultOffset
+            profiles[p.uid] = p
+            try? store.save(p)
+        }
     }
 
     /// Set by `--snapshot` (renders the panel to a PNG without capturing audio).
