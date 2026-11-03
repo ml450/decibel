@@ -63,10 +63,11 @@ struct NowPlayingTile: View {
         let np = model.nowPlaying
         if let track = np.track {
             Card {
-                HStack(alignment: .center) {
+                HStack(alignment: .center, spacing: 0) {
                     artwork(np.artwork)
-                    Spacer(minLength: 4)
+                    // Centred in the space between the cover and the card's edge, level with the cover.
                     controls(np, playing: track.isPlaying)
+                        .frame(maxWidth: .infinity)
                 }
                 .frame(height: Self.topRow)   // same as the device tile, so the titles line up
                 VStack(alignment: .leading, spacing: 1) {
@@ -99,25 +100,25 @@ struct NowPlayingTile: View {
 
     @ViewBuilder
     private func controls(_ np: NowPlaying, playing: Bool) -> some View {
-        let glyphs = HStack(spacing: 9) {
+        let glyphs = HStack(spacing: 12) {
             Image(systemName: "backward.fill")
-            Image(systemName: playing ? "pause.fill" : "play.fill").font(.system(size: 16)).frame(width: 16)
+            Image(systemName: playing ? "pause.fill" : "play.fill").font(.system(size: 21)).frame(width: 20)
             Image(systemName: "forward.fill")
         }
-        .font(.system(size: 11))
+        .font(.system(size: 14))
         if model.isSnapshot {
             glyphs   // ImageRenderer can't draw AppKit-backed buttons
         } else {
-            HStack(spacing: 9) {
+            HStack(spacing: 12) {
                 Button(action: np.previous) { Image(systemName: "backward.fill") }.help("Previous")
                 Button(action: np.togglePlayPause) {
-                    Image(systemName: playing ? "pause.fill" : "play.fill").font(.system(size: 16)).frame(width: 16)
+                    Image(systemName: playing ? "pause.fill" : "play.fill").font(.system(size: 21)).frame(width: 20)
                 }
                 .help(playing ? "Pause" : "Play")
                 Button(action: np.next) { Image(systemName: "forward.fill") }.help("Next")
             }
             .buttonStyle(.borderless)
-            .font(.system(size: 11))
+            .font(.system(size: 14))
             .foregroundStyle(.primary)
         }
     }
