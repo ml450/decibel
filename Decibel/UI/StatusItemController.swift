@@ -82,6 +82,10 @@ final class StatusItemController {
         visible = show
         lengthTimer?.invalidate()
         let from = revealed, to: CGFloat = show ? 1 : 0
+        // While the panel is open the item keeps its width: macOS re-centres status items when they
+        // resize, which made the ear jump on mute/unmute. The number just fades in and out in place.
+        let lengthFrom = item.length
+        let lengthTo = show ? expandedLength : (holdWidth ? item.length : iconWidth)
         let duration = show ? 0.28 : 0.22
         let begin = Date()
         lengthTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { [weak self] timer in
@@ -90,12 +94,20 @@ final class StatusItemController {
                 let t = min(1, Date().timeIntervalSince(begin) / duration)
                 let eased = CGFloat(show ? 1 - pow(1 - t, 3) : t * t * t)   // ease-out in, ease-in out
                 self.revealed = from + (to - from) * eased
-                self.item.length = self.iconWidth + (self.expandedLength - self.iconWidth) * self.revealed
+                self.item.length = lengthFrom + (lengthTo - lengthFrom) * eased
                 self.label.alphaValue = self.revealed
                 self.layoutLabel(offset: self.slide * (1 - self.revealed))
                 self.onResize?()
                 if t >= 1 { timer.invalidate() }
             }
+        }
+    }
+
+    /// Set while the panel is open; releasing it shrinks the item if the number is gone.
+    var holdWidth = false {
+        didSet {
+            guard !holdWidth, !visible, item.length > iconWidth + 0.5 else { return }
+            reveal(false)
         }
     }
 }

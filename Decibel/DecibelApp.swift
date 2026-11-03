@@ -186,6 +186,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         popover.contentViewController?.view.window?.makeKey()
     }
 
+    func popoverWillShow(_ notification: Notification) {
+        statusItem.holdWidth = true
+    }
+
     func popoverDidShow(_ notification: Notification) {
         darkenPopoverGlass()
         model.nowPlaying.startPolling()
@@ -200,6 +204,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     func popoverDidClose(_ notification: Notification) {
+        statusItem.holdWidth = false
         model.nowPlaying.stopPolling()
         if let outsideClickMonitor { NSEvent.removeMonitor(outsideClickMonitor) }
         outsideClickMonitor = nil
