@@ -146,6 +146,28 @@ final class OutputDeviceMonitor {
         return VolumeInfo(scalar: scalar, decibels: decibels, muted: muted, hasControl: true)
     }
 
+    /// Sets the output volume (0…1, as the system slider); unmutes when turning it up.
+    static func setVolume(of id: AudioDeviceID, to scalar: Double) {
+        let scope = kAudioDevicePropertyScopeOutput
+        var value = Float32(min(1, max(0, scalar)))
+        func set(_ element: AudioObjectPropertyElement) -> Bool {
+            var a = CA.address(kAudioDevicePropertyVolumeScalar, scope: scope, element: element)
+            var settable: DarwinBoolean = false
+            guard AudioObjectHasProperty(id, &a),
+                  AudioObjectIsPropertySettable(id, &a, &settable) == noErr, settable.boolValue else { return false }
+            return AudioObjectSetPropertyData(id, &a, 0, nil, UInt32(MemoryLayout<Float32>.size), &value) == noErr
+        }
+        if !set(kAudioObjectPropertyElementMain) {
+            _ = set(1)
+            _ = set(2)
+        }
+        if value > 0, isMuted(id) {
+            var a = CA.address(kAudioDevicePropertyMute, scope: scope, element: kAudioObjectPropertyElementMain)
+            var off: UInt32 = 0
+            AudioObjectSetPropertyData(id, &a, 0, nil, UInt32(MemoryLayout<UInt32>.size), &off)
+        }
+    }
+
     /// Uses the device's own volume curve to convert the slider position into dB below maximum.
     private static func decibels(_ id: AudioDeviceID, scalar: Float32, element: AudioObjectPropertyElement) -> Double? {
         let scope = kAudioDevicePropertyScopeOutput

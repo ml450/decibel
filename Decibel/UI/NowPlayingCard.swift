@@ -64,52 +64,21 @@ struct NowPlayingCard: View {
     }
 }
 
-/// Progress bar you can click or drag; it seeks when you let go.
+/// Track progress you can click or drag; it seeks when you let go.
 private struct ProgressRow: View {
     let track: NowPlaying.Track
     let now: Date
     let seek: (Double) -> Void
 
-    @State private var dragFraction: Double?
+    @State private var scrub: Double?
 
     var body: some View {
         let playing = track.duration > 0 ? track.position(at: now) / track.duration : 0
-        let fraction = min(1, max(0, dragFraction ?? playing))
-        let position = fraction * track.duration
-        let pressed = dragFraction != nil
-
+        let position = (scrub ?? playing) * track.duration
         VStack(spacing: 2) {
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.secondary.opacity(0.25))
-                    Capsule().fill(Theme.accent).frame(width: max(4, geo.size.width * fraction))
-                }
-                .frame(height: 4)
-                // Small glossy knob, only while you hold it; an overlay so it never changes the bar's height.
-                .overlay(alignment: .leading) {
-                    Circle()
-                        .fill(LinearGradient(colors: [.white, Color(white: 0.86)], startPoint: .top, endPoint: .bottom))
-                        .overlay(Circle().strokeBorder(.white.opacity(0.6), lineWidth: 0.5))
-                        .shadow(color: .black.opacity(0.35), radius: 1.5, y: 0.5)
-                        .frame(width: 11, height: 11)
-                        // Grow in place (scale before moving), and animate only the appearance, not the position.
-                        .scaleEffect(pressed ? 1 : 0.4)
-                        .opacity(pressed ? 1 : 0)
-                        .animation(.smooth(duration: 0.15), value: pressed)
-                        .offset(x: geo.size.width * fraction - 5.5)
-                }
-                .frame(maxHeight: .infinity)
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in dragFraction = Double(value.location.x / geo.size.width) }
-                        .onEnded { value in
-                            seek(min(1, max(0, Double(value.location.x / geo.size.width))) * track.duration)
-                            dragFraction = nil
-                        }
-                )
-            }
-            .frame(height: 12)
+            ThinSlider(value: playing,
+                       onChange: { scrub = $0 },
+                       onEnd: { seek($0 * track.duration); scrub = nil })
             HStack {
                 Text(Self.time(position))
                 Spacer()

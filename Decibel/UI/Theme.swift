@@ -104,3 +104,51 @@ struct DeviceIcon: View {
             .background(Theme.accent.gradient, in: RoundedRectangle(cornerRadius: size * 0.28, style: .continuous))
     }
 }
+
+/// Thin 4 pt slider used for volume and track progress. A small glossy knob appears only while held;
+/// it grows in place where you press, and only its appearance is animated.
+struct ThinSlider: View {
+    let value: Double                         // 0…1
+    var onChange: ((Double) -> Void)? = nil   // live, while dragging
+    var onEnd: ((Double) -> Void)? = nil      // when released
+
+    @State private var drag: Double?
+
+    var body: some View {
+        let fraction = min(1, max(0, drag ?? value))
+        let pressed = drag != nil
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.secondary.opacity(0.25))
+                Capsule().fill(Theme.accent).frame(width: max(4, geo.size.width * fraction))
+            }
+            .frame(height: 4)
+            .overlay(alignment: .leading) {
+                Circle()
+                    .fill(LinearGradient(colors: [.white, Color(white: 0.86)], startPoint: .top, endPoint: .bottom))
+                    .overlay(Circle().strokeBorder(.white.opacity(0.6), lineWidth: 0.5))
+                    .shadow(color: .black.opacity(0.35), radius: 1.5, y: 0.5)
+                    .frame(width: 11, height: 11)
+                    .scaleEffect(pressed ? 1 : 0.4)
+                    .opacity(pressed ? 1 : 0)
+                    .animation(.smooth(duration: 0.15), value: pressed)
+                    .offset(x: geo.size.width * fraction - 5.5)
+            }
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { g in
+                        let x = min(1, max(0, Double(g.location.x / geo.size.width)))
+                        drag = x
+                        onChange?(x)
+                    }
+                    .onEnded { g in
+                        onEnd?(min(1, max(0, Double(g.location.x / geo.size.width))))
+                        drag = nil
+                    }
+            )
+        }
+        .frame(height: 12)
+    }
+}

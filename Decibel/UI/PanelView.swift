@@ -95,7 +95,6 @@ extension HomePage {
                 NowPlayingCard().transition(.opacity.combined(with: .move(edge: .top)))
             }
             LevelsCard()
-            DoseCard()
             DevicesCard()
         }
         .padding(.horizontal, 12)
@@ -119,7 +118,21 @@ private struct NowHeader: View {
                             .help("Calibrated")
                     }
                 }
-                Text(volumeText).font(.caption).foregroundStyle(.secondary)
+                if model.volume.hasControl {
+                    // Volume slider for the current output, live while dragging.
+                    HStack(spacing: 6) {
+                        Image(systemName: model.volume.muted ? "speaker.slash.fill" : "speaker.fill")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 12)
+                        ThinSlider(value: model.volume.muted ? 0 : model.volume.scalar,
+                                   onChange: { model.setVolume($0) })
+                            .help("Volume \(Int((model.volume.scalar * 100).rounded()))%")
+                    }
+                    .frame(maxWidth: 170)
+                } else {
+                    Text(volumeText).font(.caption).foregroundStyle(.secondary)
+                }
             }
             Spacer(minLength: 8)
             if let spl = model.liveSPL {
@@ -329,63 +342,6 @@ private struct RangeTabs: View {
     }
 }
 
-// MARK: Dose
-
-private struct DoseCard: View {
-    @Environment(AppModel.self) private var model
-
-    /// What's left of the rolling 7-day allowance, expressed as listening time at 80 dB.
-    private var remainingText: String {
-        let left = (1 - model.weeklyDose) * Dose.referenceSeconds
-        guard left > 0 else { return "Turn it down to let your ears recover" }
-        let time = left >= 10 * 3600 ? "\(Int((left / 3600).rounded(.down))) h" : Format.duration(left)
-        return "About \(time) left at 80 dB this week"
-    }
-
-    var body: some View {
-        Card {
-            HStack(spacing: 12) {
-                DoseRing(fraction: model.weeklyDose, lineWidth: 5, fontSize: 10)
-                    .frame(width: 38, height: 38)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(model.weeklyDose >= 1 ? "Weekly limit reached" : "7-day sound dose")
-                        .font(.system(size: 13, weight: .semibold))
-                    Text(remainingText)
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
-            }
-        }
-    }
-}
-
-struct DoseRing: View {
-    let fraction: Double
-    var lineWidth: CGFloat = 12
-    var fontSize: CGFloat = 22
-
-    var body: some View {
-        let color: Color = fraction >= 1 ? .red : fraction >= 0.8 ? Theme.loud : Theme.accent
-        ZStack {
-            Circle().stroke(Theme.accent.opacity(0.15), lineWidth: lineWidth)
-            Circle()
-                .trim(from: 0, to: min(max(fraction, 0.001), 1))
-                .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            if fraction > 1 {
-                Circle()
-                    .trim(from: 0, to: min(fraction - 1, 1))
-                    .stroke(Color.red.opacity(0.6), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-            }
-            Text("\(Int((fraction * 100).rounded()))%")
-                .font(.system(size: fontSize, weight: .bold, design: .rounded))
-                .monospacedDigit()
-        }
-        .animation(.easeOut, value: fraction)
-    }
-}
-
 // MARK: Devices
 
 private struct DevicesCard: View {
@@ -555,15 +511,8 @@ private struct FooterStatus: View {
                 Text(message).lineLimit(1).foregroundStyle(.secondary)
             case .idle:
                 switch model.captureState {
-                case .running:
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                    Text("Measuring")
-                    if let first = model.listeningTo.first {
-                        Text("· " + first + (model.listeningTo.count > 1 ? " +\(model.listeningTo.count - 1)" : ""))
-                            .foregroundStyle(.secondary).lineLimit(1)
-                            .help("Audio from " + model.listeningTo.joined(separator: ", "))
-                    }
-                case .waiting:
+                case .running, .waiting:
+                    // Just the version; the footer only speaks up when something needs attention.
                     Text("Decibel \(updater.currentVersion)").foregroundStyle(.secondary)
                 default:
                     Image(systemName: "pause.circle.fill").foregroundStyle(.secondary)

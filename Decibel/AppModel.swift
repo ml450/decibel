@@ -140,9 +140,6 @@ final class AppModel {
     @ObservationIgnored private var silencePausedPlayers: Set<pid_t>?
     @ObservationIgnored private var lastVolume: VolumeInfo?
 
-    /// Apps that currently have audio output open (shown in the footer while measuring).
-    private(set) var listeningTo: [String] = []
-
     /// Other processes with audio output running (process taps only; ScreenCaptureKit always runs).
     private var playingProcesses: Set<pid_t> {
         if #available(macOS 14.2, *), usesTap { return AudioActivity.playingProcesses() }
@@ -365,8 +362,6 @@ final class AppModel {
     private func followPlayback() {
         guard usesTap, !pausing, captureState.isHealthy || captureState == .starting else { return }
         let players = playingProcesses
-        let names = Self.appNames(players)
-        if names != listeningTo { listeningTo = names }
 
         // A loudness measurement needs every second of the programme, quiet parts included.
         if loudnessRunning {
@@ -510,12 +505,15 @@ final class AppModel {
         }
     }
 
-    private static func appNames(_ pids: Set<pid_t>) -> [String] {
-        guard #available(macOS 14.2, *) else { return [] }
-        return Set(pids.compactMap(AudioActivity.appName)).sorted()
-    }
-
     // MARK: Devices
+
+    /// Volume slider in the panel header.
+    func setVolume(_ scalar: Double) {
+        guard let device else { return }
+        OutputDeviceMonitor.setVolume(of: device.id, to: scalar)
+        volume = OutputDeviceMonitor.volume(of: device.id)
+        wake()   // turning it up means you're listening
+    }
 
     func refreshConnected() {
         connectedUIDs = OutputDeviceMonitor.connectedOutputUIDs()
