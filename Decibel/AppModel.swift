@@ -311,6 +311,11 @@ final class AppModel {
             return
         }
         let spl = dbfs + volumeDB + profile.offset
+        // Below ~20 dB(A) nothing is audible (very low volume); treat it as silence, never as "−5 dB".
+        guard spl >= DecibelStore.audibleFloor else {
+            setLive(dbfs: dbfs, spl: nil)
+            return
+        }
         setLive(dbfs: dbfs, spl: spl)
 
         let minute = Int64(Date().timeIntervalSince1970) / 60 * 60

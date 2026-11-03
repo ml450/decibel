@@ -133,7 +133,7 @@ private struct NowHeader: View {
                 }
                 .animation(.snappy, value: Int(spl))
             } else {
-                Text(model.liveDBFS == nil ? "Silent" : "Muted")
+                Text(model.volume.isSilent && model.liveDBFS != nil ? "Muted" : "Silent")
                     .font(.callout.weight(.medium)).foregroundStyle(.tertiary)
             }
         }

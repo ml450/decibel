@@ -25,6 +25,9 @@ final class DecibelStore {
         }
     }
 
+    /// Estimates below this are inaudible and left out (older versions logged some).
+    static let audibleFloor = 20.0
+
     let url: URL
     private let db: SQLiteDB
 
@@ -109,7 +112,7 @@ final class DecibelStore {
         // Pre-aggregate to 15-minute slots (every time zone offset is a multiple of 15 min).
         try db.query("""
             SELECT (ts / 900) * 900 AS slot, device_uid, SUM(seconds), SUM(energy)
-            FROM minutes WHERE ts >= ? AND ts < ? GROUP BY slot, device_uid
+            FROM minutes WHERE ts >= ? AND ts < ? AND avg_db >= \(Self.audibleFloor) GROUP BY slot, device_uid
             """, [.int(Int64(interval.start.timeIntervalSince1970)), .int(Int64(interval.end.timeIntervalSince1970))]) { r in
             let date = Date(timeIntervalSince1970: TimeInterval(r.int(0)))
             let start = calendar.dateInterval(of: range.bucket, for: date)?.start ?? date
@@ -131,7 +134,7 @@ final class DecibelStore {
     /// Rolling 7-day dose (1.0 = 80 dB(A) for 40 h, 3 dB exchange rate).
     func weeklyDose(now: Date = Date()) throws -> Double {
         var dose = 0.0
-        try db.query("SELECT seconds, avg_db FROM minutes WHERE ts >= ?",
+        try db.query("SELECT seconds, avg_db FROM minutes WHERE ts >= ? AND avg_db >= \(Self.audibleFloor)",
                      [.int(Int64(now.timeIntervalSince1970 - 7 * 86_400))]) { r in
             dose += Dose.fraction(seconds: Double(r.int(0)), db: r.double(1))
         }
