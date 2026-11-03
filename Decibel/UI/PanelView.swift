@@ -115,8 +115,8 @@ private struct NowHeader: View {
     }
 
     private var row: some View {
-        HStack(spacing: 12) {
-            DeviceIcon(symbol: model.currentProfile?.symbol ?? "speaker.wave.2.fill", size: 36)
+        HStack(spacing: 14) {
+            LiveLevel().frame(minWidth: 64, alignment: .leading)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(model.device?.name ?? "No output device")
@@ -147,8 +147,6 @@ private struct NowHeader: View {
                     Text(volumeText).font(.caption).foregroundStyle(.secondary)
                 }
             }
-            Spacer(minLength: 12)
-            LiveLevel()
 
         }
     }

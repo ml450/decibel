@@ -1,29 +1,28 @@
 import SwiftUI
 
-/// Live level as a small pill ("56 dB"), tinted green / yellow / red by level; grey "Silent" when quiet.
-/// Shared by the wide header and the compact tile.
+/// Live level as a big number ("56 dB"), coloured green / yellow / red by level; grey "Silent" when quiet.
+/// Takes the place of the device icon in both the tile and the wide header.
 struct LiveLevel: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        let spl = model.liveSPL
-        let tint = spl.map(Theme.levelColor) ?? .secondary
-        HStack(alignment: .firstTextBaseline, spacing: 2) {
-            if let spl {
-                Text(Format.db(spl))
-                    .font(.system(size: 13, weight: .semibold, design: .rounded)).monospacedDigit()
-                    .contentTransition(.numericText())
-                Text("dB").font(.system(size: 10, weight: .semibold))
+        Group {
+            if let spl = model.liveSPL {
+                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                    Text(Format.db(spl))
+                        .font(.system(size: 28, weight: .semibold, design: .rounded)).monospacedDigit()
+                        .foregroundStyle(Theme.levelColor(spl))
+                        .contentTransition(.numericText())
+                    Text("dB").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                }
+                .animation(.snappy, value: Int(spl))
             } else {
                 Text(model.volume.isSilent && model.liveDBFS != nil ? "Muted" : "Silent")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.tertiary)
             }
         }
-        .foregroundStyle(tint)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .background(Capsule().fill(tint.opacity(0.15)))
-        .animation(.snappy, value: spl.map { Int($0) })
+        .frame(height: 36, alignment: .leading)   // same height as the album cover next to it
     }
 }
 
@@ -33,11 +32,7 @@ struct DeviceTile: View {
 
     var body: some View {
         Card {
-            HStack(alignment: .center) {
-                DeviceIcon(symbol: model.currentProfile?.symbol ?? "speaker.wave.2.fill", size: 36)
-                Spacer(minLength: 4)
-                LiveLevel()
-            }
+            LiveLevel()
             VStack(alignment: .leading, spacing: 1) {
                 Text(model.device?.name ?? "No output device")
                     .font(.system(size: 13, weight: .semibold)).lineLimit(1)
