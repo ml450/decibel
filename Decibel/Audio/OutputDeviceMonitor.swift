@@ -168,6 +168,18 @@ final class OutputDeviceMonitor {
         }
     }
 
+    static func setMuted(_ muted: Bool, of id: AudioDeviceID) {
+        var value: UInt32 = muted ? 1 : 0
+        for element in [kAudioObjectPropertyElementMain, 1, 2] {
+            var a = CA.address(kAudioDevicePropertyMute, scope: kAudioDevicePropertyScopeOutput, element: element)
+            var settable: DarwinBoolean = false
+            guard AudioObjectHasProperty(id, &a),
+                  AudioObjectIsPropertySettable(id, &a, &settable) == noErr, settable.boolValue else { continue }
+            AudioObjectSetPropertyData(id, &a, 0, nil, UInt32(MemoryLayout<UInt32>.size), &value)
+            if element == kAudioObjectPropertyElementMain { return }
+        }
+    }
+
     /// Uses the device's own volume curve to convert the slider position into dB below maximum.
     private static func decibels(_ id: AudioDeviceID, scalar: Float32, element: AudioObjectPropertyElement) -> Double? {
         let scope = kAudioDevicePropertyScopeOutput

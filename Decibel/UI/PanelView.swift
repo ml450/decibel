@@ -136,9 +136,7 @@ private struct NowHeader: View {
                 if model.volume.hasControl {
                     // Volume slider for the current output, live while dragging.
                     HStack(spacing: 6) {
-                        Image(systemName: model.volume.muted ? "speaker.slash.fill" : "speaker.fill")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.secondary)
+                        VolumeButton()
                         ThinSlider(value: model.volume.muted ? 0 : model.volume.scalar,
                                    onChange: { model.setVolume($0) })
                     }

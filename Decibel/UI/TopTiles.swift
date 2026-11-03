@@ -42,8 +42,7 @@ struct DeviceTile: View {
             Spacer(minLength: 0)
             if model.volume.hasControl {
                 HStack(spacing: 5) {
-                    Image(systemName: model.volume.muted ? "speaker.slash.fill" : "speaker.fill")
-                        .font(.system(size: 9)).foregroundStyle(.secondary)
+                    VolumeButton()
                     ThinSlider(value: model.volume.muted ? 0 : model.volume.scalar,
                                onChange: { model.setVolume($0) })
                     Text(model.volume.muted ? "Off" : "\(Int((model.volume.scalar * 100).rounded()))%")
@@ -121,6 +120,40 @@ struct NowPlayingTile: View {
             .buttonStyle(.borderless)
             .font(.system(size: 11))
             .foregroundStyle(.primary)
+        }
+    }
+}
+
+/// Speaker icon with 0–3 waves by volume (crossed out when muted); click to mute or unmute.
+struct VolumeButton: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let v = model.volume
+        if model.isSnapshot {
+            icon(v)   // ImageRenderer can't draw AppKit-backed buttons
+        } else {
+            Button { model.toggleMute() } label: { icon(v) }
+                .buttonStyle(.borderless)
+                .help(v.muted ? "Unmute" : "Mute")
+        }
+    }
+
+    private func icon(_ v: VolumeInfo) -> some View {
+        Image(systemName: Self.symbol(v))
+            .font(.system(size: 10))
+            .foregroundStyle(.secondary)
+            .frame(width: 16, alignment: .leading)   // fixed, so the slider doesn't move as waves come and go
+            .contentTransition(.symbolEffect(.replace))
+    }
+
+    static func symbol(_ v: VolumeInfo) -> String {
+        if v.muted { return "speaker.slash.fill" }
+        switch v.scalar {
+        case ..<0.01: return "speaker.fill"
+        case ..<0.34: return "speaker.wave.1.fill"
+        case ..<0.67: return "speaker.wave.2.fill"
+        default: return "speaker.wave.3.fill"
         }
     }
 }

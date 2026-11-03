@@ -515,6 +515,14 @@ final class AppModel {
         wake()   // turning it up means you're listening
     }
 
+    /// The speaker icon next to the volume slider.
+    func toggleMute() {
+        guard let device else { return }
+        OutputDeviceMonitor.setMuted(!volume.muted, of: device.id)
+        volume = OutputDeviceMonitor.volume(of: device.id)
+        onLiveChange?()
+    }
+
     func refreshConnected() {
         connectedUIDs = OutputDeviceMonitor.connectedOutputUIDs()
     }
