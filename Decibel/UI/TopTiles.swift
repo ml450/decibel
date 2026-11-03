@@ -48,6 +48,7 @@ struct DeviceTile: View {
                                onChange: { model.setVolume($0) })
                     Text(model.volume.muted ? "Off" : "\(Int((model.volume.scalar * 100).rounded()))%")
                         .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                        .padding(.leading, 4)
                 }
                 .help("Volume")
             }
