@@ -67,3 +67,26 @@ enum Uninstaller {
         }
     }
 }
+
+/// "Share Decibel" in the settings menu: a link to the download page.
+@MainActor
+enum ShareDecibel {
+    static let message = "Decibel viser hvor høyt du hører, rett i menylinjen på Macen."
+
+    static func copyLink() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(Uninstaller.downloadPage.absoluteString, forType: .string)
+    }
+
+    static func share(via name: NSSharingService.Name) {
+        guard let service = NSSharingService(named: name) else { return copyLink() }
+        service.subject = "Decibel"
+        let items: [Any] = name == .sendViaAirDrop ? [Uninstaller.downloadPage] : [message, Uninstaller.downloadPage]
+        if service.canPerform(withItems: items) {
+            NSApp.activate(ignoringOtherApps: true)
+            service.perform(withItems: items)
+        } else {
+            copyLink()
+        }
+    }
+}

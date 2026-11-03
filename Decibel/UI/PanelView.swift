@@ -490,10 +490,13 @@ private struct FooterBar: View {
         Menu {
             Toggle("Launch at Login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
             Toggle("Show Level in Menu Bar", isOn: Binding(get: { model.showLevelInMenuBar }, set: { model.showLevelInMenuBar = $0 }))
-            ShareLink(item: Uninstaller.downloadPage,
-                      subject: Text("Decibel"),
-                      message: Text("Decibel viser hvor høyt du hører, rett i menylinjen på Macen.")) {
-                Text("Share Decibel…")
+            // Plain items (no ShareLink icon), so everything lines up under the checkmarks.
+            Menu("Share Decibel") {
+                Button("Copy Link") { ShareDecibel.copyLink() }
+                Divider()
+                Button("Messages") { ShareDecibel.share(via: .composeMessage) }
+                Button("Mail") { ShareDecibel.share(via: .composeEmail) }
+                Button("AirDrop") { ShareDecibel.share(via: .sendViaAirDrop) }
             }
             Divider()
             Button("Uninstall Decibel…") { Uninstaller.confirmAndUninstall(model: model) }
