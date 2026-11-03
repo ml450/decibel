@@ -1,24 +1,29 @@
 import SwiftUI
 
-/// Live level, shared by the wide header and the compact tile.
+/// Live level as a small pill ("56 dB"), tinted green / yellow / red by level; grey "Silent" when quiet.
+/// Shared by the wide header and the compact tile.
 struct LiveLevel: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        if let spl = model.liveSPL {
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Circle().fill(Theme.levelColor(spl)).frame(width: 7, height: 7)
-                    .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
+        let spl = model.liveSPL
+        let tint = spl.map(Theme.levelColor) ?? .secondary
+        HStack(alignment: .firstTextBaseline, spacing: 2) {
+            if let spl {
                 Text(Format.db(spl))
-                    .font(.system(size: 22, weight: .semibold, design: .rounded)).monospacedDigit()
+                    .font(.system(size: 13, weight: .semibold, design: .rounded)).monospacedDigit()
                     .contentTransition(.numericText())
-                Text("dB").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                Text("dB").font(.system(size: 10, weight: .semibold))
+            } else {
+                Text(model.volume.isSilent && model.liveDBFS != nil ? "Muted" : "Silent")
+                    .font(.system(size: 12, weight: .semibold))
             }
-            .animation(.snappy, value: Int(spl))
-        } else {
-            Text(model.volume.isSilent && model.liveDBFS != nil ? "Muted" : "Silent")
-                .font(.callout.weight(.medium)).foregroundStyle(.tertiary)
         }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Capsule().fill(tint.opacity(0.15)))
+        .animation(.snappy, value: spl.map { Int($0) })
     }
 }
 
