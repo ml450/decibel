@@ -111,26 +111,29 @@ private struct NowHeader: View {
         HStack(spacing: 12) {
             DeviceIcon(symbol: model.currentProfile?.symbol ?? "speaker.wave.2.fill", size: 32)
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(model.device?.name ?? "No output device")
                         .font(.system(size: 13, weight: .semibold)).lineLimit(1)
                     if model.currentProfile?.calibrated == true {
                         Image(systemName: "checkmark.seal.fill").font(.caption2).foregroundStyle(Theme.accent)
                             .help("Calibrated")
                     }
+                    if model.volume.hasControl {
+                        Spacer(minLength: 6)
+                        // Right-aligned above the end of the slider.
+                        Text(model.volume.muted ? "Muted" : "\(Int((model.volume.scalar * 100).rounded()))%")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 if model.volume.hasControl {
                     // Volume slider for the current output, live while dragging.
-                    HStack(spacing: 5) {
+                    HStack(spacing: 6) {
                         Image(systemName: model.volume.muted ? "speaker.slash.fill" : "speaker.fill")
                             .font(.system(size: 9))
                             .foregroundStyle(.secondary)
                         ThinSlider(value: model.volume.muted ? 0 : model.volume.scalar,
                                    onChange: { model.setVolume($0) })
-                        Text(model.volume.muted ? "Muted" : "\(Int((model.volume.scalar * 100).rounded()))%")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                            .frame(width: 38, alignment: .leading)
                     }
                     .help("Volume")
                 } else {
