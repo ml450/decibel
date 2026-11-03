@@ -71,28 +71,29 @@ private struct ProgressRow: View {
     let seek: (Double) -> Void
 
     @State private var dragFraction: Double?
-    @State private var hovering = false
 
     var body: some View {
         let playing = track.duration > 0 ? track.position(at: now) / track.duration : 0
         let fraction = min(1, max(0, dragFraction ?? playing))
         let position = fraction * track.duration
-        let active = hovering || dragFraction != nil
+        let pressed = dragFraction != nil
 
         VStack(spacing: 2) {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.secondary.opacity(0.25))
                     Capsule().fill(Theme.accent).frame(width: max(4, geo.size.width * fraction))
-                    if active {
-                        Circle()
-                            .fill(.white)
-                            .shadow(radius: 1)
-                            .frame(width: 10, height: 10)
-                            .offset(x: geo.size.width * fraction - 5)
-                    }
+                    // Small glossy knob, only while you hold it.
+                    Circle()
+                        .fill(LinearGradient(colors: [.white, Color(white: 0.86)], startPoint: .top, endPoint: .bottom))
+                        .overlay(Circle().strokeBorder(.white.opacity(0.6), lineWidth: 0.5))
+                        .shadow(color: .black.opacity(0.35), radius: 1.5, y: 0.5)
+                        .frame(width: 11, height: 11)
+                        .offset(x: geo.size.width * fraction - 5.5)
+                        .scaleEffect(pressed ? 1 : 0.4)
+                        .opacity(pressed ? 1 : 0)
                 }
-                .frame(height: active ? 6 : 4)
+                .frame(height: 4)
                 .frame(maxHeight: .infinity)
                 .contentShape(Rectangle())
                 .gesture(
@@ -103,8 +104,7 @@ private struct ProgressRow: View {
                             dragFraction = nil
                         }
                 )
-                .onHover { hovering = $0 }
-                .animation(.smooth(duration: 0.15), value: active)
+                .animation(.smooth(duration: 0.15), value: pressed)
             }
             .frame(height: 12)
             HStack {
