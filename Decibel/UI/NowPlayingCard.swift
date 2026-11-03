@@ -26,7 +26,6 @@ struct NowPlayingCard: View {
                     controls(np, playing: track.isPlaying)
                 }
             }
-            .help("\(track.player.appName)")
         }
     }
 
