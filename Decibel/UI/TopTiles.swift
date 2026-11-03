@@ -65,9 +65,11 @@ struct NowPlayingTile: View {
             Card {
                 HStack(alignment: .center, spacing: 0) {
                     artwork(np.artwork)
-                    // Centred in the space between the cover and the card's edge, level with the cover.
+                    // Centred between the cover and the card's wall (the card's 12 pt padding included),
+                    // and between the card's top and the title, which is the cover's centre line.
                     controls(np, playing: track.isPlaying)
                         .frame(maxWidth: .infinity)
+                        .offset(x: 6, y: -1)
                 }
                 .frame(height: Self.topRow)   // same as the device tile, so the titles line up
                 VStack(alignment: .leading, spacing: 1) {
