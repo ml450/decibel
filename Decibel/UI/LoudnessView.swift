@@ -38,6 +38,7 @@ struct PanelTabs: View {
 /// LUFS meter in the style of a mixer's loudness panel: M, S and TP bars plus the key numbers.
 struct LoudnessTab: View {
     @Environment(AppModel.self) private var model
+    @State private var addingCustom = false
 
     var body: some View {
         let r = model.loudness
@@ -45,7 +46,11 @@ struct LoudnessTab: View {
         let goal = model.targetLUFS
 
         VStack(alignment: .leading, spacing: 10) {
-            TargetMenu()
+            TargetMenu(addingCustom: $addingCustom)
+            if addingCustom {
+                CustomTargetRow(isPresented: $addingCustom)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
 
             Card {
                 HStack(alignment: .top, spacing: 0) {
@@ -229,6 +234,7 @@ private struct MeterBar: View {
 /// Target picker with saved custom targets: add them with a value, remove them from a submenu.
 private struct TargetMenu: View {
     @Environment(AppModel.self) private var model
+    @Binding var addingCustom: Bool
 
     var body: some View {
         Menu {
@@ -238,7 +244,7 @@ private struct TargetMenu: View {
                 ForEach(model.customTargets, id: \.self) { option(.custom($0)) }
             }
             Divider()
-            Button("Add Custom Target…") { addCustom() }
+            Button("Add Custom Target…") { withAnimation(.smooth(duration: 0.2)) { addingCustom = true } }
             if !model.customTargets.isEmpty {
                 Menu("Remove Custom Target") {
                     ForEach(model.customTargets, id: \.self) { value in
@@ -256,26 +262,53 @@ private struct TargetMenu: View {
         Toggle(target.label, isOn: Binding(get: { model.loudnessTarget == target },
                                            set: { if $0 { model.loudnessTarget = target } }))
     }
+}
 
-    private func addCustom() {
-        NSApp.activate(ignoringOtherApps: true)
-        let alert = NSAlert()
-        alert.messageText = "Custom loudness target"
-        alert.informativeText = "Enter the integrated loudness to aim for, in LUFS (for example −16)."
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 120, height: 24))
-        field.placeholderString = "−16"
-        alert.accessoryView = field
-        alert.addButton(withTitle: "Add")
-        alert.addButton(withTitle: "Cancel")
-        alert.window.initialFirstResponder = field
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        let text = field.stringValue
+/// Inline "−16 LUFS [Cancel] [Add]" row, so nothing opens outside the panel.
+private struct CustomTargetRow: View {
+    @Environment(AppModel.self) private var model
+    @Binding var isPresented: Bool
+    @State private var text = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            TextField("−16", text: $text)
+                .textFieldStyle(.roundedBorder)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 64)
+                .focused($focused)
+                .onSubmit(add)
+            Text("LUFS").foregroundStyle(.secondary)
+            Spacer()
+            Button("Cancel") { close() }
+            Button("Add", action: add)
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.accent)
+                .disabled(Self.parse(text) == nil)
+        }
+        .onAppear { focused = true }
+        .onExitCommand(perform: close)
+    }
+
+    private func add() {
+        guard let value = Self.parse(text) else { return }
+        model.addCustomTarget(value)
+        close()
+    }
+
+    private func close() {
+        withAnimation(.smooth(duration: 0.2)) { isPresented = false }
+    }
+
+    /// Accepts "16", "−16", "-16,5" and "−16 LUFS"; positive numbers mean negative LUFS.
+    static func parse(_ text: String) -> Double? {
+        let cleaned = text
             .replacingOccurrences(of: "−", with: "-")
             .replacingOccurrences(of: ",", with: ".")
             .replacingOccurrences(of: "LUFS", with: "", options: .caseInsensitive)
             .trimmingCharacters(in: .whitespaces)
-        guard var value = Double(text) else { return }
-        if value > 0 { value = -value }   // "16" means −16
-        model.addCustomTarget(value)
+        guard let value = Double(cleaned), value != 0, abs(value) <= 40 else { return nil }
+        return -abs(value)
     }
 }
