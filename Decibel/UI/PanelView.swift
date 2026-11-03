@@ -424,7 +424,8 @@ private struct FooterBar: View {
             Spacer()
             if model.isSnapshot {
                 // ImageRenderer can't draw AppKit-backed buttons and menus.
-                ForEach(["gauge.with.needle", "gearshape"], id: \.self) { FooterIcon(symbol: $0) }
+                FooterIcon(symbol: "gauge.with.needle", size: 14)
+                FooterIcon(symbol: "gearshape", size: 16)
             } else {
                 controls
             }
@@ -438,7 +439,7 @@ private struct FooterBar: View {
         UpdateButton()
 
         Button { model.page = .calibrate } label: {
-            FooterIcon(symbol: "gauge.with.needle")
+            FooterIcon(symbol: "gauge.with.needle", size: 14)
         }
         .buttonStyle(.borderless)
         .help("Calibrate device")
@@ -460,7 +461,7 @@ private struct FooterBar: View {
             Button("Quit Decibel") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
         } label: {
-            FooterIcon(symbol: "gearshape")
+            FooterIcon(symbol: "gearshape", size: 16)
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
@@ -473,10 +474,12 @@ private struct FooterBar: View {
 struct FooterIcon: View {
     let symbol: String
     var color: Color? = nil
+    /// Optical sizes: a closed ring reads larger than a toothed gear at the same point size.
+    var size: CGFloat = 15
 
     var body: some View {
         Image(systemName: symbol)
-            .font(.system(size: 15, weight: .regular))
+            .font(.system(size: size, weight: .regular))
             .foregroundStyle(color ?? .primary)
             .frame(width: 22, height: 22)
     }
