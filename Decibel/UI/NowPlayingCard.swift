@@ -92,9 +92,11 @@ private struct ProgressRow: View {
                         .overlay(Circle().strokeBorder(.white.opacity(0.6), lineWidth: 0.5))
                         .shadow(color: .black.opacity(0.35), radius: 1.5, y: 0.5)
                         .frame(width: 11, height: 11)
-                        .offset(x: geo.size.width * fraction - 5.5)
+                        // Grow in place (scale before moving), and animate only the appearance, not the position.
                         .scaleEffect(pressed ? 1 : 0.4)
                         .opacity(pressed ? 1 : 0)
+                        .animation(.smooth(duration: 0.15), value: pressed)
+                        .offset(x: geo.size.width * fraction - 5.5)
                 }
                 .frame(maxHeight: .infinity)
                 .contentShape(Rectangle())
@@ -106,7 +108,6 @@ private struct ProgressRow: View {
                             dragFraction = nil
                         }
                 )
-                .animation(.smooth(duration: 0.15), value: pressed)
             }
             .frame(height: 12)
             HStack {
