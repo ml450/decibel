@@ -24,6 +24,7 @@ struct NowPlayingCard: View {
                         .padding(.top, 1)
                     }
                     controls(np, playing: track.isPlaying)
+                        .frame(width: Theme.trailingColumn, alignment: .trailing)
                 }
             }
         }
@@ -40,7 +41,7 @@ struct NowPlayingCard: View {
                 }
             }
         }
-        .frame(width: 56, height: 56)
+        .frame(width: Theme.leadingArt, height: Theme.leadingArt)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
