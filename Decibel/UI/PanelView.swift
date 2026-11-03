@@ -211,35 +211,38 @@ private struct LevelsCard: View {
         let avg = selected?.avgDB ?? s.avgDB
 
         Card {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("AVERAGE")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                    HStack(alignment: .firstTextBaseline, spacing: 3) {
-                        Text(Format.db(avg))
-                            .font(.system(size: 30, weight: .semibold, design: .rounded)).monospacedDigit()
-                        Text("dB").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
+            RangeTabs(range: $model.range)
+
+            // Same pattern as every other row in the panel: what it is on the left, the number on the right.
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(selected.map { "Average · \(bucketLabel($0.start))" } ?? "Average")
+                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
+                    HStack(spacing: 5) {
+                        if let avg {
+                            Text(avg >= 80 ? "Loud" : "OK").fontWeight(.semibold)
+                                .foregroundStyle(avg >= 80 ? Theme.loud : .green)
+                            Text("·").foregroundStyle(.tertiary)
+                        }
+                        Text(Format.duration(selected?.seconds ?? s.seconds))
+                        if selected == nil {
+                            Text("·").foregroundStyle(.tertiary)
+                            Text(Format.rangeLabel(range, s.interval))
+                        }
                     }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
                 }
-                Spacer()
-                RangeTabs(range: $model.range)
-            }
-            HStack(spacing: 5) {
-                if let avg {
-                    Image(systemName: avg >= 80 ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                        .foregroundStyle(avg >= 80 ? Theme.loud : .green)
-                    Text(avg >= 80 ? "Loud" : "OK").fontWeight(.semibold)
-                        .foregroundStyle(avg >= 80 ? Theme.loud : .green)
-                    Text("·").foregroundStyle(.tertiary)
+                Spacer(minLength: 8)
+                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    Text(Format.db(avg))
+                        .font(.system(size: 22, weight: .semibold, design: .rounded)).monospacedDigit()
+                        .contentTransition(.numericText())
+                    Text("dB").font(.caption.weight(.medium)).foregroundStyle(.secondary)
                 }
-                Text(Format.duration(selected?.seconds ?? s.seconds))
-                Text("·").foregroundStyle(.tertiary)
-                Text(selected.map { bucketLabel($0.start) } ?? Format.rangeLabel(range, s.interval))
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(.top, -6)
 
             Chart {
                 ForEach(slots(s, range), id: \.self) { d in
@@ -333,7 +336,7 @@ private struct RangeTabs: View {
                 Text(r.rawValue)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(r == range ? Color.white : Color.secondary)
-                    .padding(.horizontal, 7)
+                    .frame(maxWidth: .infinity)
                     .padding(.vertical, 3)
                     .background {
                         if r == range {
