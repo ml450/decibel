@@ -140,7 +140,6 @@ private struct NowHeader: View {
                         ThinSlider(value: model.volume.muted ? 0 : model.volume.scalar,
                                    onChange: { model.setVolume($0) })
                     }
-                    .help("Volume")
                 } else {
                     Text(volumeText).font(.caption).foregroundStyle(.secondary)
                 }

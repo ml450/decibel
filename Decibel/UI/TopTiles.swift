@@ -49,7 +49,6 @@ struct DeviceTile: View {
                         .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
                         .padding(.leading, 4)
                 }
-                .help("Volume")
             }
         }
     }

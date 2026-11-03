@@ -93,6 +93,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
 
         statusItem = StatusItemController()
+        statusItem.onResize = { [weak self] in
+            guard let self, self.popover.isShown else { return }
+            self.popover.positioningRect = self.statusItem.earRect
+        }
         statusItem.item.button?.target = self
         statusItem.item.button?.action = #selector(togglePanel)
         model.onLiveChange = { [weak self] in self?.updateStatusItem() }
@@ -178,7 +182,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         model.wake()   // opening the panel resumes a silence pause, so the level is live
         model.updater.checkIfStale()
         NSApp.activate(ignoringOtherApps: true)
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        popover.show(relativeTo: statusItem.earRect, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
     }
 

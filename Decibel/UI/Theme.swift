@@ -106,18 +106,19 @@ struct DeviceIcon: View {
     }
 }
 
-/// Thin 4 pt slider used for volume and track progress. A small glossy knob appears only while held;
-/// it grows in place where you press, and only its appearance is animated.
+/// Thin 4 pt slider used for volume and track progress. A small glossy knob appears on hover and while
+/// dragging (as in Spotify and macOS); it grows in place, and only its appearance is animated.
 struct ThinSlider: View {
     let value: Double                         // 0…1
     var onChange: ((Double) -> Void)? = nil   // live, while dragging
     var onEnd: ((Double) -> Void)? = nil      // when released
 
     @State private var drag: Double?
+    @State private var hovering = false
 
     var body: some View {
         let fraction = min(1, max(0, drag ?? value))
-        let pressed = drag != nil
+        let pressed = drag != nil || hovering
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.secondary.opacity(0.25))
@@ -137,6 +138,7 @@ struct ThinSlider: View {
             }
             .frame(maxHeight: .infinity)
             .contentShape(Rectangle())
+            .onHover { hovering = $0 }
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { g in

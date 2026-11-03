@@ -6,6 +6,15 @@ import AppKit
 @MainActor
 final class StatusItemController {
     let item: NSStatusItem
+    /// Called whenever the item's width changes, so an open panel can stay anchored to the ear.
+    var onResize: (() -> Void)?
+
+    /// The ear, in the button's coordinates. It never moves on screen (the item grows to the left),
+    /// so anchoring the panel here keeps it still while the number comes and goes.
+    var earRect: NSRect {
+        guard let button = item.button else { return .zero }
+        return NSRect(x: button.bounds.width - iconWidth, y: 0, width: iconWidth, height: button.bounds.height)
+    }
 
     private let icon = PassthroughImageView()
     private let label = PassthroughLabel(labelWithString: "")
@@ -49,6 +58,7 @@ final class StatusItemController {
         } else if widthChanged {
             item.length = expandedLength
             layoutLabel(offset: 0)
+            onResize?()
         }
     }
 
@@ -83,6 +93,7 @@ final class StatusItemController {
                 self.item.length = self.iconWidth + (self.expandedLength - self.iconWidth) * self.revealed
                 self.label.alphaValue = self.revealed
                 self.layoutLabel(offset: self.slide * (1 - self.revealed))
+                self.onResize?()
                 if t >= 1 { timer.invalidate() }
             }
         }
