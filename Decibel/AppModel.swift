@@ -100,10 +100,15 @@ final class AppModel {
            let targets = try? JSONDecoder().decode([CustomLoudnessTarget].self, from: data) {
             return targets
         }
-        // Earlier versions saved bare values.
-        return (defaults.array(forKey: "customLUFSTargets") as? [Double] ?? []).map {
+        // Earlier versions saved bare values. Convert once and store, so the ids stay the same afterwards.
+        let migrated = (defaults.array(forKey: "customLUFSTargets") as? [Double] ?? []).map {
             CustomLoudnessTarget(name: "Custom", lufs: $0)
         }
+        if let data = try? JSONEncoder().encode(migrated) {
+            defaults.set(data, forKey: "customLoudnessTargets")
+            defaults.removeObject(forKey: "customLUFSTargets")
+        }
+        return migrated
     }
 
     /// The coloured level next to the ear in the menu bar (some find it distracting).
@@ -443,12 +448,33 @@ final class AppModel {
         Task { await old?.stop() }
     }
 
+    /// Apps worth measuring: regular apps that are playing right now, plus known media apps while they're open.
     private func refreshAudioApps() {
         guard #available(macOS 14.2, *), usesTap else { return }
-        let names = Set((AudioActivity.clients() ?? []).compactMap { AudioActivity.appName($0.pid) })
-            .filter { !$0.isEmpty && !$0.hasPrefix("com.apple.") }
-            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
-        if names != audioApps { audioApps = names }
+        let regular = Dictionary(
+            NSWorkspace.shared.runningApplications
+                .filter { $0.activationPolicy == .regular }
+                .compactMap { app -> (String, Bool)? in
+                    guard let url = app.bundleURL, !url.path.hasPrefix("/System/") else { return nil }
+                    return (url.deletingPathExtension().lastPathComponent, true)
+                },
+            uniquingKeysWith: { a, _ in a })
+        var names = Set<String>()
+        for client in AudioActivity.clients() ?? [] {
+            guard let name = AudioActivity.appName(client.pid), regular[name] != nil else { continue }
+            if client.playing || Self.isMediaApp(name) { names.insert(name) }
+        }
+        let sorted = names.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        if sorted != audioApps { audioApps = sorted }
+    }
+
+    /// Editors, players and browsers people check loudness from.
+    private static func isMediaApp(_ name: String) -> Bool {
+        let prefixes = ["DaVinci Resolve", "Final Cut", "Adobe Premiere", "Adobe Audition", "Adobe After Effects",
+                        "Logic Pro", "GarageBand", "Ableton", "Pro Tools", "Reaper", "Spotify", "Music", "TV",
+                        "QuickTime Player", "VLC", "IINA", "Arc", "Google Chrome", "Safari", "Firefox",
+                        "Microsoft Edge", "Brave Browser", "Opera", "Vivaldi", "YouTube", "Tidal", "Deezer"]
+        return prefixes.contains { name == $0 || name.hasPrefix($0 + " ") }
     }
 
     /// Resume a silence pause right away (panel opened, volume or device changed).

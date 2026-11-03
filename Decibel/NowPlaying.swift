@@ -37,8 +37,11 @@ final class NowPlaying {
 
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var artworkKey: String?
-    @ObservationIgnored private var scripts: [String: NSAppleScript] = [:]
+    @ObservationIgnored private let scripts = ScriptRunner()
     @ObservationIgnored private var denied: Set<Player> = []
+    @ObservationIgnored private var polling = false
+    /// Ignore polls for a moment after a button press, so the optimistic state isn't overwritten by a stale read.
+    @ObservationIgnored private var holdUntil = Date.distantPast
 
     // MARK: Polling
 
@@ -56,15 +59,24 @@ final class NowPlaying {
     }
 
     func poll() {
-        // Prefer whichever app is actually playing; otherwise show a paused track.
-        let tracks = Player.allCases.compactMap(read)
-        let next = tracks.first(where: \.isPlaying) ?? tracks.first
-        if next != track { track = next }
-        if let next, next.key != artworkKey { loadArtwork(for: next) }
-        if next == nil, artwork != nil { artwork = nil; artworkKey = nil }
+        guard !polling else { return }
+        polling = true
+        Task {
+            var tracks: [Track] = []
+            for player in Player.allCases {
+                if let t = await read(player) { tracks.append(t) }
+            }
+            polling = false
+            guard Date() >= holdUntil else { return }
+            // Prefer whichever app is actually playing; otherwise show a paused track.
+            let next = tracks.first(where: \.isPlaying) ?? tracks.first
+            if next != track { track = next }
+            if let next, next.key != artworkKey { loadArtwork(for: next) }
+            if next == nil, artwork != nil { artwork = nil; artworkKey = nil }
+        }
     }
 
-    private func read(_ player: Player) -> Track? {
+    private func read(_ player: Player) async -> Track? {
         guard player.isRunning, !denied.contains(player) else { return nil }
         let sep = "character id 31"
         let source: String
@@ -86,7 +98,7 @@ final class NowPlaying {
             end tell
             """
         }
-        guard let text = run(source, for: player)?.stringValue, !text.isEmpty else { return nil }
+        guard let text = await run(source, for: player).string, !text.isEmpty else { return nil }
         let f = text.components(separatedBy: "\u{1F}")
         guard f.count >= 7 else { return nil }
         func number(_ s: String) -> Double { Double(s.replacingOccurrences(of: ",", with: ".")) ?? 0 }
@@ -97,20 +109,36 @@ final class NowPlaying {
 
     // MARK: Controls
 
-    func togglePlayPause() { command("playpause") }
+    /// Buttons update the card at once and send the command in the background (Spotify can take a moment).
+    func togglePlayPause() {
+        guard var t = track else { return }
+        t.position = t.position(at: Date())
+        t.readAt = Date()
+        t.isPlaying.toggle()
+        track = t
+        command("playpause")
+    }
+
     func next() { command("next track") }
     func previous() { command("previous track") }
 
     func seek(to seconds: Double) {
-        guard let track else { return }
-        let value = String(format: "%.1f", max(0, min(seconds, track.duration)))
-        command("set player position to \(value)")
+        guard var t = track else { return }
+        let value = max(0, min(seconds, t.duration))
+        t.position = value
+        t.readAt = Date()
+        track = t
+        command("set player position to \(String(format: "%.1f", value))")
     }
 
     private func command(_ verb: String) {
         guard let player = track?.player else { return }
-        _ = run("tell application id \"\(player.rawValue)\" to \(verb)", for: player)
-        poll()
+        holdUntil = Date().addingTimeInterval(0.8)
+        Task {
+            _ = await run("tell application id \"\(player.rawValue)\" to \(verb)", for: player)
+            try? await Task.sleep(for: .milliseconds(900))
+            poll()
+        }
     }
 
     // MARK: Artwork
@@ -128,7 +156,9 @@ final class NowPlaying {
             }
         case .music:
             let source = "tell application id \"com.apple.Music\" to get raw data of artwork 1 of current track"
-            if let data = run(source, for: .music)?.data, !data.isEmpty {
+            Task {
+                guard let data = await run(source, for: .music).data, !data.isEmpty,
+                      artworkKey == track.key else { return }
                 artwork = NSImage(data: data)
             }
         }
@@ -136,19 +166,10 @@ final class NowPlaying {
 
     // MARK: AppleScript
 
-    private func run(_ source: String, for player: Player) -> NSAppleEventDescriptor? {
-        let script = scripts[source] ?? {
-            let s = NSAppleScript(source: source)!
-            scripts[source] = s
-            return s
-        }()
-        var error: NSDictionary?
-        let result = script.executeAndReturnError(&error)
-        if let code = error?[NSAppleScript.errorNumber] as? Int {
-            // -1743: the user said no to "Decibel wants to control …"; don't keep asking.
-            if code == -1743 { denied.insert(player) }
-            return nil
-        }
+    private func run(_ source: String, for player: Player) async -> ScriptRunner.Result {
+        let result = await scripts.run(source)
+        // -1743: the user said no to "Decibel wants to control …"; don't keep asking.
+        if result.error == -1743 { denied.insert(player) }
         return result
     }
 
@@ -158,5 +179,33 @@ final class NowPlaying {
     func applyDemo() {
         track = Track(player: .spotify, title: "Weightless", artist: "Marconi Union", album: "Weightless",
                       duration: 480, position: 151, isPlaying: true, artworkURL: nil)
+    }
+}
+
+/// Runs AppleScript on one background queue (NSAppleScript isn't thread-safe), caching compiled scripts.
+final class ScriptRunner: @unchecked Sendable {
+    struct Result: Sendable {
+        var string: String?
+        var data: Data?
+        var error: Int?
+    }
+
+    private let queue = DispatchQueue(label: "decibel.nowplaying.scripts", qos: .userInitiated)
+    private var cache: [String: NSAppleScript] = [:]   // queue only
+
+    func run(_ source: String) async -> Result {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                let script = self.cache[source] ?? {
+                    let s = NSAppleScript(source: source)!
+                    self.cache[source] = s
+                    return s
+                }()
+                var error: NSDictionary?
+                let descriptor = script.executeAndReturnError(&error)
+                continuation.resume(returning: Result(string: descriptor.stringValue, data: descriptor.data,
+                                                      error: error?[NSAppleScript.errorNumber] as? Int))
+            }
+        }
     }
 }

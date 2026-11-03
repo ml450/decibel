@@ -69,7 +69,7 @@ struct LoudnessTab: View {
                 HStack(alignment: .top, spacing: 0) {
                     // The bars take whatever height the tab has to spare.
                     GeometryReader { geo in
-                        let barHeight = max(120, geo.size.height - Meter.labelHeight)
+                        let barHeight = max(84, geo.size.height - Meter.labelHeight)
                         HStack(alignment: .top, spacing: 12) {
                             MeterScale(target: goal, height: barHeight)
                             MeterBar(label: "M", value: r?.momentary, target: goal, height: barHeight)
@@ -78,7 +78,7 @@ struct LoudnessTab: View {
                         }
                     }
                     .frame(width: 22 + 3 * 16 + 3 * 12)
-                    .frame(minHeight: 212)
+                    .frame(minHeight: 100)
                     Spacer(minLength: 16)
                     VStack(alignment: .leading, spacing: 9) {
                         stat("Short", r?.shortTerm)
@@ -339,15 +339,11 @@ private struct CustomTargetEditor: View {
             }
             HStack(spacing: 8) {
                 if exists {
-                    Button(role: .destructive) {
+                    Button("Delete", role: .destructive) {
                         model.deleteCustomTarget(original.id)
                         close()
-                    } label: {
-                        Image(systemName: "trash")
                     }
-                    .buttonStyle(.borderless)
                     .foregroundStyle(.red)
-                    .help("Delete target")
                 }
                 Spacer()
                 Button("Cancel") { close() }

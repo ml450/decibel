@@ -21,7 +21,7 @@ struct NowPlayingCard: View {
                         TimelineView(.periodic(from: .now, by: 0.5)) { context in
                             ProgressRow(track: track, now: context.date) { np.seek(to: $0) }
                         }
-                        .padding(.top, 3)
+                        .padding(.top, 1)
                     }
                     controls(np, playing: track.isPlaying)
                 }
@@ -64,26 +64,49 @@ struct NowPlayingCard: View {
     }
 }
 
+/// Progress bar you can click or drag; it seeks when you let go.
 private struct ProgressRow: View {
     let track: NowPlaying.Track
     let now: Date
     let seek: (Double) -> Void
 
+    @State private var dragFraction: Double?
+    @State private var hovering = false
+
     var body: some View {
-        let position = track.position(at: now)
-        let fraction = track.duration > 0 ? position / track.duration : 0
+        let playing = track.duration > 0 ? track.position(at: now) / track.duration : 0
+        let fraction = min(1, max(0, dragFraction ?? playing))
+        let position = fraction * track.duration
+        let active = hovering || dragFraction != nil
+
         VStack(spacing: 2) {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.secondary.opacity(0.25))
                     Capsule().fill(Theme.accent).frame(width: max(4, geo.size.width * fraction))
+                    if active {
+                        Circle()
+                            .fill(.white)
+                            .shadow(radius: 1)
+                            .frame(width: 10, height: 10)
+                            .offset(x: geo.size.width * fraction - 5)
+                    }
                 }
+                .frame(height: active ? 6 : 4)
+                .frame(maxHeight: .infinity)
                 .contentShape(Rectangle())
-                .onTapGesture(coordinateSpace: .local) { point in
-                    seek(Double(point.x / geo.size.width) * track.duration)
-                }
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in dragFraction = Double(value.location.x / geo.size.width) }
+                        .onEnded { value in
+                            seek(min(1, max(0, Double(value.location.x / geo.size.width))) * track.duration)
+                            dragFraction = nil
+                        }
+                )
+                .onHover { hovering = $0 }
+                .animation(.smooth(duration: 0.15), value: active)
             }
-            .frame(height: 4)
+            .frame(height: 12)
             HStack {
                 Text(Self.time(position))
                 Spacer()
