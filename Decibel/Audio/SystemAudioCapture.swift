@@ -17,6 +17,7 @@ final class SystemAudioCapture: NSObject, SCStreamOutput, SCStreamDelegate {
 
     private var stream: SCStream?
     private var meter: LevelMeter?
+    let loudness = LoudnessFeed()
     private let audioQueue = DispatchQueue(label: "decibel.capture.audio", qos: .userInitiated)
     private let screenQueue = DispatchQueue(label: "decibel.capture.screen", qos: .background)
 
@@ -74,12 +75,16 @@ final class SystemAudioCapture: NSObject, SCStreamOutput, SCStreamDelegate {
                     buf.mData.map { UnsafePointer($0.assumingMemoryBound(to: Float.self)) }
                 }
                 let count = min(frames, abl.map { Int($0.mDataByteSize) / 4 }.min() ?? 0)
-                meter.process(frameCount: count, channelCount: channels.count) { c, i in channels[c][i] }
+                let sample = { (c: Int, i: Int) -> Float in channels[c][i] }
+                meter.process(frameCount: count, channelCount: channels.count, sample: sample)
+                loudness.feed(sampleRate: asbd.mSampleRate, frameCount: count, channelCount: channels.count, sample: sample)
             } else if let buf = abl.first, let data = buf.mData {
                 let ptr = data.assumingMemoryBound(to: Float.self)
                 let ch = max(1, Int(buf.mNumberChannels))
                 let count = min(frames, Int(buf.mDataByteSize) / 4 / ch)
-                meter.process(frameCount: count, channelCount: ch) { c, i in ptr[i * ch + c] }
+                let sample = { (c: Int, i: Int) -> Float in ptr[i * ch + c] }
+                meter.process(frameCount: count, channelCount: ch, sample: sample)
+                loudness.feed(sampleRate: asbd.mSampleRate, frameCount: count, channelCount: ch, sample: sample)
             }
         }
     }

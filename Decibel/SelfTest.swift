@@ -109,7 +109,41 @@ enum SelfTest {
         let offset = 75 - (weighted + -12)
         check("calibration offset round-trip", abs((weighted - 12 + offset) - 75) < 1e-9, String(format: "offset %.1f dB", offset))
 
-        // 7. Update version comparison
+        // 7. Loudness (EBU Tech 3341 reference cases)
+        func loudness(_ parts: [(dbfs: Double, seconds: Double)], frequency: Double = 1000, phase: Double = 0) -> LoudnessMeter {
+            let meter = LoudnessMeter(sampleRate: sr)
+            for part in parts {
+                let amp = pow(10, part.dbfs / 20)
+                let n = Int(part.seconds * sr)
+                var i = 0
+                while i < n {
+                    let count = min(4800, n - i)
+                    let base = i
+                    meter.process(frameCount: count, channelCount: 2) { _, j in
+                        Float(amp * sin(2 * .pi * frequency * Double(base + j) / sr + phase))
+                    }
+                    i += count
+                }
+            }
+            return meter
+        }
+        let ebu1 = loudness([(-23, 20)])
+        check("LUFS: stereo 1 kHz at −23 dBFS = −23 LUFS", abs((ebu1.integratedNow ?? 0) + 23) < 0.1,
+              String(format: "%.2f LUFS", ebu1.integratedNow ?? .nan))
+        let ebu3 = loudness([(-36, 10), (-23, 60), (-36, 10)])
+        check("LUFS: gating (−36/−23/−36) = −23 LUFS", abs((ebu3.integratedNow ?? 0) + 23) < 0.1,
+              String(format: "%.2f LUFS", ebu3.integratedNow ?? .nan))
+        let silent = loudness([(-80, 5)])
+        check("LUFS: below −70 is gated out", silent.integratedNow == nil, "nil")
+        let lra = loudness([(-20, 20), (-30, 20)])
+        check("loudness range (−20/−30) ≈ 10 LU", abs((lra.rangeNow ?? 0) - 10) < 1,
+              String(format: "%.1f LU", lra.rangeNow ?? .nan))
+        // fs/4 sine at 45°: samples only reach −3 dB of the true peak.
+        let tp = loudness([(-6.02, 2)], frequency: sr / 4, phase: .pi / 4)
+        check("true peak finds inter-sample peaks", abs((tp.truePeakNow ?? 0) + 6.02) < 0.3,
+              String(format: "%.2f dBTP (sample peak −9.03)", tp.truePeakNow ?? .nan))
+
+        // 8. Update version comparison
         check("update versions", Updater.isNewer("1.1", than: "1.0") && Updater.isNewer("1.0.1", than: "1.0")
               && Updater.isNewer("1.10", than: "1.9") && !Updater.isNewer("1.0", than: "1.0.0")
               && !Updater.isNewer("0.9", than: "1.0"), "1.1 > 1.0, 1.0.1 > 1.0, 1.10 > 1.9, 1.0 = 1.0.0")

@@ -13,7 +13,23 @@ struct PanelView: View {
     var body: some View {
         ZStack(alignment: .top) {
             switch model.page {
-            case .home: HomePage().transition(Self.pageTransition)
+            case .home, .loudness:
+                // The two tabs share the tab bar and footer; only their content changes.
+                VStack(spacing: 0) {
+                    PanelTabs()
+                        .padding(.top, 12)
+                        .padding(.bottom, 2)
+                    ZStack(alignment: .top) {
+                        if model.page == .home {
+                            HomePage().transition(.opacity)
+                        } else {
+                            LoudnessTab().transition(.opacity)
+                        }
+                    }
+                    Divider()
+                    FooterBar()
+                }
+                .transition(Self.pageTransition)
             case .calibrate: CalibrationPage().transition(Self.pageTransition)
             case .device(let uid):
                 Group {
@@ -38,13 +54,10 @@ private struct HomePage: View {
         VStack(spacing: 0) {
             NowHeader()
                 .padding(.horizontal, 16)
-                .padding(.top, 14)
+                .padding(.top, 10)
                 .padding(.bottom, 12)
 
             content
-
-            Divider()
-            FooterBar()
         }
     }
 }

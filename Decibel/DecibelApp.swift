@@ -64,6 +64,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 model.range = range
             }
             if args.contains("--page"), args.contains("calibrate") { model.page = .calibrate }
+            if args.contains("--page"), args.contains("loudness") {
+                model.page = .loudness
+                if args.contains("--demo") { model.applyDemoLoudness() }
+            }
             model.reloadStats()
             // Stand-in for the popover material, which ImageRenderer can't draw.
             let renderer = ImageRenderer(content: PanelView().environment(model)
@@ -94,6 +98,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         updateStatusItem()
 
         model.start()
+
+        // `--loudness-test N`: measure loudness for N seconds and log the result (tests the whole chain).
+        if let i = CommandLine.arguments.firstIndex(of: "--loudness-test"), i + 1 < CommandLine.arguments.count,
+           let seconds = Double(CommandLine.arguments[i + 1]) {
+            model.startLoudness()
+            DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {
+                let r = self.model.loudness
+                log.info("loudness-test: integrated \(r?.integrated ?? .nan) LUFS, true peak \(r?.truePeak ?? .nan) dBTP, \(r?.seconds ?? 0) s")
+                self.model.stopLoudness()
+            }
+        }
 
         // `--install-update`: what the Install button does, for testing the update path from Terminal.
         if CommandLine.arguments.contains("--install-update") {

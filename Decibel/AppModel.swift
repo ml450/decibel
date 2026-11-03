@@ -9,7 +9,7 @@ import os
 let log = Logger(subsystem: "local.decibel.app", category: "decibel")
 
 enum PanelPage: Equatable {
-    case home, calibrate, device(String)
+    case home, calibrate, loudness, device(String)
 }
 
 enum CaptureState: Equatable {
@@ -38,6 +38,13 @@ final class AppModel {
 
     var page: PanelPage = .home
 
+    // Loudness (LUFS) measurement for delivery checks
+    private(set) var loudness: LoudnessReading?
+    private(set) var loudnessRunning = false
+    var loudnessTarget: LoudnessTarget = LoudnessTarget(rawValue: UserDefaults.standard.string(forKey: "loudnessTarget") ?? "") ?? .streaming {
+        didSet { UserDefaults.standard.set(loudnessTarget.rawValue, forKey: "loudnessTarget") }
+    }
+
     /// The coloured level next to the ear in the menu bar (some find it distracting).
     var showLevelInMenuBar: Bool = UserDefaults.standard.object(forKey: "showLevelInMenuBar") as? Bool ?? true {
         didSet {
@@ -61,6 +68,7 @@ final class AppModel {
     @ObservationIgnored private var lastPlaybackAt = Date.distantPast
     @ObservationIgnored private var lastSoundAt = Date.distantPast
     @ObservationIgnored private var pausing = false
+    @ObservationIgnored private var startInFlight = false
     /// Set while the tap is paused because it only heard silence; holds the apps that had output open then.
     @ObservationIgnored private var silencePausedPlayers: Set<pid_t>?
     @ObservationIgnored private var lastVolume: VolumeInfo?
@@ -91,6 +99,13 @@ final class AppModel {
         deviceChanged(OutputDeviceMonitor.defaultOutputDevice())
     }
 
+    /// A finished sample measurement for `--snapshot --page loudness --demo`.
+    func applyDemoLoudness() {
+        loudness = LoudnessReading(momentary: -15.8, shortTerm: -14.1, integrated: -14.5,
+                                   maxMomentary: -9.5, shortTermMax: -12.9, range: 7.4, truePeak: -2.9, seconds: 154)
+        loudnessRunning = true
+    }
+
     /// Live state for `--snapshot --demo` (AirPods playing at a comfortable level).
     func applyDemo() {
         profiles = Dictionary(uniqueKeysWithValues: ((try? store.devices()) ?? []).map { ($0.uid, $0) })
@@ -112,6 +127,12 @@ final class AppModel {
 
         capture.onLevel = { [weak self] level in
             Task { @MainActor in self?.handleSecond(level) }
+        }
+        capture.loudness.onUpdate = { [weak self] reading in
+            Task { @MainActor in
+                guard let self, self.loudnessRunning else { return }
+                self.loudness = reading
+            }
         }
         capture.onStop = { [weak self] error in
             Task { @MainActor in self?.captureStopped(error) }
@@ -145,6 +166,7 @@ final class AppModel {
             return
         }
         guard !capture.isRunning else { captureState = .running; return }
+        guard !startInFlight else { return }   // never run two taps at once
         guard force || !playingProcesses.isEmpty else {
             captureState = .waiting
             onLiveChange?()
@@ -153,7 +175,9 @@ final class AppModel {
         lastPlaybackAt = Date()
         lastSoundAt = Date()   // grace period before a silence pause
         captureState = .starting
+        startInFlight = true
         Task {
+            defer { startInFlight = false }
             do {
                 try await capture.start()
                 captureState = .running
@@ -262,6 +286,12 @@ final class AppModel {
         let names = Self.appNames(players)
         if names != listeningTo { listeningTo = names }
 
+        // A loudness measurement needs every second of the programme, quiet parts included.
+        if loudnessRunning {
+            if captureState == .waiting { startCapture(force: true) }
+            return
+        }
+
         if players.isEmpty {
             silencePausedPlayers = nil
             if capture.isRunning, Date().timeIntervalSince(lastPlaybackAt) > 5 {
@@ -280,6 +310,30 @@ final class AppModel {
         } else if capture.isRunning, Date().timeIntervalSince(lastSoundAt) > 15 {
             pause(reason: "Only silence", players: players)
         }
+    }
+
+    /// Starts or resumes the loudness measurement; the tap stays on while it runs.
+    func startLoudness() {
+        let fresh = loudness == nil
+        if fresh { loudness = .empty }
+        loudnessRunning = true
+        silencePausedPlayers = nil
+        capture.loudness.start(reset: fresh)
+        if !capture.isRunning { startCapture(force: true) }
+        log.info("Loudness measurement \(fresh ? "started" : "resumed", privacy: .public)")
+    }
+
+    /// Pauses; the values so far stay on screen and resume from there.
+    func stopLoudness() {
+        loudnessRunning = false
+        capture.loudness.pause()
+        log.info("Loudness measurement paused")
+    }
+
+    /// Clears the measurement. If it was running, it keeps running from zero.
+    func resetLoudness() {
+        capture.loudness.reset()
+        loudness = loudnessRunning ? .empty : nil
     }
 
     /// Resume a silence pause right away (panel opened, volume or device changed).

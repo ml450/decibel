@@ -6,6 +6,8 @@ protocol SystemAudioSource: AnyObject {
     /// Called on a background queue once per second of audio; nil = silence.
     var onLevel: ((Double?) -> Void)? { get set }
     var onStop: ((Error) -> Void)? { get set }
+    /// Loudness (LUFS) measurement fed from the same samples.
+    var loudness: LoudnessFeed { get }
     var isRunning: Bool { get }
     func start() async throws
     func stop() async
@@ -31,6 +33,8 @@ final class SystemAudioTap: SystemAudioSource {
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
     private var procID: AudioDeviceIOProcID?
     private var meter: LevelMeter?
+    let loudness = LoudnessFeed()
+
     private let queue = DispatchQueue(label: "hearing.tap.audio", qos: .userInitiated)
 
     var isRunning: Bool { procID != nil }
@@ -112,13 +116,18 @@ final class SystemAudioTap: SystemAudioSource {
             // Interleaved
             let ptr = data.assumingMemoryBound(to: Float.self)
             let ch = max(1, Int(buf.mNumberChannels))
-            meter.process(frameCount: Int(buf.mDataByteSize) / 4 / ch, channelCount: ch) { c, i in ptr[i * ch + c] }
+            let frames = Int(buf.mDataByteSize) / 4 / ch
+            let sample = { (c: Int, i: Int) -> Float in ptr[i * ch + c] }
+            meter.process(frameCount: frames, channelCount: ch, sample: sample)
+            loudness.feed(sampleRate: meter.sampleRate, frameCount: frames, channelCount: ch, sample: sample)
         } else {
             let channels: [UnsafePointer<Float>] = abl.compactMap { b in
                 b.mData.map { UnsafePointer($0.assumingMemoryBound(to: Float.self)) }
             }
             let frames = abl.map { Int($0.mDataByteSize) / 4 }.min() ?? 0
-            meter.process(frameCount: frames, channelCount: channels.count) { c, i in channels[c][i] }
+            let sample = { (c: Int, i: Int) -> Float in channels[c][i] }
+            meter.process(frameCount: frames, channelCount: channels.count, sample: sample)
+            loudness.feed(sampleRate: meter.sampleRate, frameCount: frames, channelCount: channels.count, sample: sample)
         }
     }
 
