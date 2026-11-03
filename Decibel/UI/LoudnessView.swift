@@ -38,7 +38,8 @@ struct PanelTabs: View {
 /// LUFS meter in the style of a mixer's loudness panel: M, S and TP bars plus the key numbers.
 struct LoudnessTab: View {
     @Environment(AppModel.self) private var model
-    @State private var addingCustom = false
+    /// The custom target being created or edited in the inline row (nil = row hidden).
+    @State private var editing: CustomLoudnessTarget?
 
     var body: some View {
         let r = model.loudness
@@ -46,9 +47,21 @@ struct LoudnessTab: View {
         let goal = model.targetLUFS
 
         VStack(alignment: .leading, spacing: 10) {
-            TargetMenu(addingCustom: $addingCustom)
-            if addingCustom {
-                CustomTargetRow(isPresented: $addingCustom)
+            HStack(spacing: 6) {
+                TargetMenu(editing: $editing)
+                if case .custom(let current) = target, editing == nil {
+                    Button { withAnimation(.smooth(duration: 0.2)) { editing = current } } label: {
+                        Image(systemName: "pencil")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Edit target")
+                }
+                Spacer(minLength: 8)
+                if model.canPickLoudnessSource { SourceMenu() }
+            }
+            if let draft = editing {
+                CustomTargetEditor(draft: draft, editing: $editing)
+                    .id(draft.id)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
@@ -111,7 +124,8 @@ struct LoudnessTab: View {
             }
             .controlSize(.large)
 
-            Text("Press Start and play your video from the beginning. Decibel measures everything your Mac plays, so mute other apps meanwhile.")
+            Text(model.loudnessSource.map { "Press Start and play your video from the beginning. Only sound from \($0) is measured." }
+                 ?? "Press Start and play your video from the beginning. Decibel measures everything your Mac plays, so mute other apps meanwhile.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineSpacing(2)
@@ -231,31 +245,27 @@ private struct MeterBar: View {
     }
 }
 
-/// Target picker with saved custom targets: add them with a value, remove them from a submenu.
+/// Built-in and saved targets, plus "New Target…". Editing and deleting live in the inline editor.
 private struct TargetMenu: View {
     @Environment(AppModel.self) private var model
-    @Binding var addingCustom: Bool
+    @Binding var editing: CustomLoudnessTarget?
 
     var body: some View {
         Menu {
             ForEach(LoudnessTarget.builtIn, id: \.self) { option($0) }
             if !model.customTargets.isEmpty {
                 Divider()
-                ForEach(model.customTargets, id: \.self) { option(.custom($0)) }
+                ForEach(model.customTargets) { option(.custom($0)) }
             }
             Divider()
-            Button("Add Custom Target…") { withAnimation(.smooth(duration: 0.2)) { addingCustom = true } }
-            if !model.customTargets.isEmpty {
-                Menu("Remove Custom Target") {
-                    ForEach(model.customTargets, id: \.self) { value in
-                        Button("\(LoudnessTarget.format(value)) LUFS") { model.removeCustomTarget(value) }
-                    }
-                }
+            Button("New Target…") {
+                withAnimation(.smooth(duration: 0.2)) { editing = CustomLoudnessTarget(name: "", lufs: -16) }
             }
         } label: {
             Text(model.loudnessTarget.label)
         }
-        .frame(maxWidth: .infinity)
+        .fixedSize()
+        .help("Loudness target")
     }
 
     private func option(_ target: LoudnessTarget) -> some View {
@@ -264,41 +274,106 @@ private struct TargetMenu: View {
     }
 }
 
-/// Inline "−16 LUFS [Cancel] [Add]" row, so nothing opens outside the panel.
-private struct CustomTargetRow: View {
+/// Which audio the loudness meter listens to: everything, or one app.
+private struct SourceMenu: View {
     @Environment(AppModel.self) private var model
-    @Binding var isPresented: Bool
-    @State private var text = ""
-    @FocusState private var focused: Bool
 
     var body: some View {
-        HStack(spacing: 8) {
-            TextField("−16", text: $text)
-                .textFieldStyle(.roundedBorder)
-                .multilineTextAlignment(.trailing)
-                .frame(width: 64)
-                .focused($focused)
-                .onSubmit(add)
-            Text("LUFS").foregroundStyle(.secondary)
-            Spacer()
-            Button("Cancel") { close() }
-            Button("Add", action: add)
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.accent)
-                .disabled(Self.parse(text) == nil)
+        let apps = model.audioApps
+        Menu {
+            option("All audio", nil)
+            if !apps.isEmpty { Divider() }
+            ForEach(apps, id: \.self) { option($0, $0) }
+            if let chosen = model.loudnessSource, !apps.contains(chosen) {
+                Divider()
+                option("\(chosen) (not running)", chosen)
+            }
+        } label: {
+            Label(model.loudnessSource ?? "All audio",
+                  systemImage: model.loudnessSource == nil ? "speaker.wave.2" : "app.badge")
         }
-        .onAppear { focused = true }
+        .fixedSize()
+        .help("Measure all audio, or one app")
+    }
+
+    private func option(_ title: String, _ source: String?) -> some View {
+        Toggle(title, isOn: Binding(get: { model.loudnessSource == source },
+                                    set: { if $0 { model.loudnessSource = source } }))
+    }
+}
+
+/// Inline editor for a custom target: name, value, and Delete (when it already exists) / Cancel / Save.
+private struct CustomTargetEditor: View {
+    @Environment(AppModel.self) private var model
+    @Binding var editing: CustomLoudnessTarget?
+    private let original: CustomLoudnessTarget
+    @State private var name: String
+    @State private var value: String
+    @FocusState private var focus: Field?
+
+    private enum Field { case name, value }
+
+    init(draft: CustomLoudnessTarget, editing: Binding<CustomLoudnessTarget?>) {
+        original = draft
+        _editing = editing
+        _name = State(initialValue: draft.name)
+        _value = State(initialValue: LoudnessTarget.format(draft.lufs))
+    }
+
+    private var exists: Bool { model.customTargets.contains { $0.id == original.id } }
+
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                TextField("Name, e.g. Podcast", text: $name)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($focus, equals: .name)
+                    .onSubmit(save)
+                TextField("−16", text: $value)
+                    .textFieldStyle(.roundedBorder)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 56)
+                    .focused($focus, equals: .value)
+                    .onSubmit(save)
+                Text("LUFS").foregroundStyle(.secondary)
+            }
+            HStack(spacing: 8) {
+                if exists {
+                    Button(role: .destructive) {
+                        model.deleteCustomTarget(original.id)
+                        close()
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.red)
+                    .help("Delete target")
+                }
+                Spacer()
+                Button("Cancel") { close() }
+                Button(exists ? "Save" : "Add", action: save)
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.accent)
+                    .disabled(Self.parse(value) == nil)
+            }
+        }
+        .padding(10)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .onAppear { focus = .name }
         .onExitCommand(perform: close)
     }
 
-    private func add() {
-        guard let value = Self.parse(text) else { return }
-        model.addCustomTarget(value)
+    private func save() {
+        guard let lufs = Self.parse(value) else { return }
+        var target = original
+        target.name = name.trimmingCharacters(in: .whitespaces)
+        target.lufs = lufs
+        model.saveCustomTarget(target)
         close()
     }
 
     private func close() {
-        withAnimation(.smooth(duration: 0.2)) { isPresented = false }
+        withAnimation(.smooth(duration: 0.2)) { editing = nil }
     }
 
     /// Accepts "16", "−16", "-16,5" and "−16 LUFS"; positive numbers mean negative LUFS.

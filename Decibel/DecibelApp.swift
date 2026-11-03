@@ -99,9 +99,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         model.start()
 
-        // `--loudness-test N`: measure loudness for N seconds and log the result (tests the whole chain).
+        // `--loudness-test N [--loudness-source App]`: measure for N seconds and log the result (tests the whole chain).
         if let i = CommandLine.arguments.firstIndex(of: "--loudness-test"), i + 1 < CommandLine.arguments.count,
            let seconds = Double(CommandLine.arguments[i + 1]) {
+            if let s = CommandLine.arguments.firstIndex(of: "--loudness-source"), s + 1 < CommandLine.arguments.count {
+                model.loudnessSource = CommandLine.arguments[s + 1]
+            }
             model.startLoudness()
             DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {
                 let r = self.model.loudness

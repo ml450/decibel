@@ -33,7 +33,14 @@ final class SystemAudioTap: SystemAudioSource {
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
     private var procID: AudioDeviceIOProcID?
     private var meter: LevelMeter?
-    let loudness = LoudnessFeed()
+    let loudness: LoudnessFeed
+    /// nil: everything except Decibel. Otherwise only these Core Audio process objects (one app).
+    let processes: [AudioObjectID]?
+
+    init(processes: [AudioObjectID]? = nil, loudness: LoudnessFeed = LoudnessFeed()) {
+        self.processes = processes
+        self.loudness = loudness
+    }
 
     private let queue = DispatchQueue(label: "hearing.tap.audio", qos: .userInitiated)
 
@@ -42,7 +49,8 @@ final class SystemAudioTap: SystemAudioSource {
     func start() async throws {
         await stop()
 
-        let description = CATapDescription(stereoGlobalTapButExcludeProcesses: Self.ownProcessObject().map { [$0] } ?? [])
+        let description = processes.map { CATapDescription(stereoMixdownOfProcesses: $0) }
+            ?? CATapDescription(stereoGlobalTapButExcludeProcesses: Self.ownProcessObject().map { [$0] } ?? [])
         description.uuid = UUID()
         description.name = "Decibel level meter"
         description.isPrivate = true
@@ -149,22 +157,44 @@ final class SystemAudioTap: SystemAudioSource {
 /// Which processes are playing audio, from Core Audio's process objects (macOS 14.2+).
 @available(macOS 14.2, *)
 enum AudioActivity {
-    /// PIDs of processes other than Decibel with audio output running.
-    /// If Core Audio can't tell us, report "something" rather than miss sound.
-    static func playingProcesses() -> Set<pid_t> {
+    struct Client {
+        let object: AudioObjectID
+        let pid: pid_t
+        let playing: Bool
+    }
+
+    /// Every process registered with Core Audio except Decibel.
+    static func clients() -> [Client]? {
         let system = AudioObjectID(kAudioObjectSystemObject)
         var address = CA.address(kAudioHardwarePropertyProcessObjectList)
         var size: UInt32 = 0
-        guard AudioObjectGetPropertyDataSize(system, &address, 0, nil, &size) == noErr, size > 0 else { return [-1] }
+        guard AudioObjectGetPropertyDataSize(system, &address, 0, nil, &size) == noErr, size > 0 else { return nil }
         var ids = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
-        guard AudioObjectGetPropertyData(system, &address, 0, nil, &size, &ids) == noErr else { return [-1] }
+        guard AudioObjectGetPropertyData(system, &address, 0, nil, &size, &ids) == noErr else { return nil }
         let me = getpid()
-        var playing = Set<pid_t>()
-        for id in ids {
-            guard let pid: pid_t = CA.get(id, CA.address(kAudioProcessPropertyPID)), pid != me else { continue }
+        return ids.compactMap { id in
+            guard let pid: pid_t = CA.get(id, CA.address(kAudioProcessPropertyPID)), pid != me else { return nil }
             let running: UInt32? = CA.get(id, CA.address(kAudioProcessPropertyIsRunningOutput))
-            if running == 1 { playing.insert(pid) }
+            return Client(object: id, pid: pid, playing: running == 1)
         }
-        return playing
+    }
+
+    /// PIDs of processes other than Decibel with audio output running.
+    /// If Core Audio can't tell us, report "something" rather than miss sound.
+    static func playingProcesses() -> Set<pid_t> {
+        guard let clients = clients() else { return [-1] }
+        return Set(clients.filter(\.playing).map(\.pid))
+    }
+
+    /// "Google Chrome" rather than "Google Chrome Helper (Renderer)": the outermost .app in the process path.
+    static func appName(_ pid: pid_t) -> String? {
+        guard pid > 0 else { return nil }
+        var buffer = [CChar](repeating: 0, count: 4096)
+        guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return nil }
+        let path = String(cString: buffer)
+        if let app = path.split(separator: "/").first(where: { $0.hasSuffix(".app") }) {
+            return String(app.dropLast(4))
+        }
+        return (path as NSString).lastPathComponent
     }
 }

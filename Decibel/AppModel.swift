@@ -41,24 +41,69 @@ final class AppModel {
     // Loudness (LUFS) measurement for delivery checks
     private(set) var loudness: LoudnessReading?
     private(set) var loudnessRunning = false
-    var loudnessTarget = LoudnessTarget(storageKey: UserDefaults.standard.string(forKey: "loudnessTarget")) {
-        didSet { UserDefaults.standard.set(loudnessTarget.storageKey, forKey: "loudnessTarget") }
+    /// The user's own loudness targets, in the order they were made.
+    private(set) var customTargets: [CustomLoudnessTarget] = AppModel.loadCustomTargets() {
+        didSet {
+            if let data = try? JSONEncoder().encode(customTargets) {
+                UserDefaults.standard.set(data, forKey: "customLoudnessTargets")
+            }
+        }
     }
-    /// Saved custom targets (LUFS), newest last.
-    private(set) var customTargets: [Double] = UserDefaults.standard.array(forKey: "customLUFSTargets") as? [Double] ?? [] {
-        didSet { UserDefaults.standard.set(customTargets, forKey: "customLUFSTargets") }
+    var loudnessTarget = LoudnessTarget(storageKey: UserDefaults.standard.string(forKey: "loudnessTarget"),
+                                        customs: AppModel.loadCustomTargets()) {
+        didSet { UserDefaults.standard.set(loudnessTarget.storageKey, forKey: "loudnessTarget") }
     }
     var targetLUFS: Double { loudnessTarget.lufs }
 
-    func addCustomTarget(_ lufs: Double) {
-        let value = (min(0, max(-40, lufs)) * 10).rounded() / 10
-        if !customTargets.contains(value) { customTargets.append(value) }
-        loudnessTarget = .custom(value)
+    /// Where the loudness measurement listens: nil = all audio, otherwise one app by name ("DaVinci Resolve").
+    var loudnessSource: String? = UserDefaults.standard.string(forKey: "loudnessSource") {
+        didSet {
+            guard loudnessSource != oldValue else { return }
+            UserDefaults.standard.set(loudnessSource, forKey: "loudnessSource")
+            // A new source is a new measurement.
+            if loudnessRunning { stopLoudness() }
+            capture.loudness.pause()
+            appLoudness.pause()
+            loudness = nil
+        }
+    }
+    /// Apps registered with Core Audio right now, for the source menu.
+    private(set) var audioApps: [String] = []
+    /// Choosing one app needs process taps (macOS 14.2+).
+    var canPickLoudnessSource: Bool { usesTap }
+    @ObservationIgnored private let appLoudness = LoudnessFeed()
+    @ObservationIgnored private var sourceTap: SystemAudioSource?
+    @ObservationIgnored private var sourceTapProcesses: Set<AudioObjectID> = []
+    @ObservationIgnored private var sourceTapBusy = false
+    private var activeLoudness: LoudnessFeed { loudnessSource == nil ? capture.loudness : appLoudness }
+
+    /// Adds a new target or updates an existing one (same id), and selects it.
+    func saveCustomTarget(_ target: CustomLoudnessTarget) {
+        var t = target
+        t.lufs = (min(0, max(-40, t.lufs)) * 10).rounded() / 10
+        if let i = customTargets.firstIndex(where: { $0.id == t.id }) {
+            customTargets[i] = t
+        } else {
+            customTargets.append(t)
+        }
+        loudnessTarget = .custom(t)
     }
 
-    func removeCustomTarget(_ lufs: Double) {
-        customTargets.removeAll { $0 == lufs }
-        if loudnessTarget == .custom(lufs) { loudnessTarget = .social }
+    func deleteCustomTarget(_ id: UUID) {
+        customTargets.removeAll { $0.id == id }
+        if case .custom(let t) = loudnessTarget, t.id == id { loudnessTarget = .social }
+    }
+
+    private static func loadCustomTargets() -> [CustomLoudnessTarget] {
+        let defaults = UserDefaults.standard
+        if let data = defaults.data(forKey: "customLoudnessTargets"),
+           let targets = try? JSONDecoder().decode([CustomLoudnessTarget].self, from: data) {
+            return targets
+        }
+        // Earlier versions saved bare values.
+        return (defaults.array(forKey: "customLUFSTargets") as? [Double] ?? []).map {
+            CustomLoudnessTarget(name: "Custom", lufs: $0)
+        }
     }
 
     /// The coloured level next to the ear in the menu bar (some find it distracting).
@@ -144,12 +189,14 @@ final class AppModel {
         capture.onLevel = { [weak self] level in
             Task { @MainActor in self?.handleSecond(level) }
         }
-        capture.loudness.onUpdate = { [weak self] reading in
+        let showReading: (LoudnessReading) -> Void = { [weak self] reading in
             Task { @MainActor in
                 guard let self, self.loudnessRunning else { return }
                 self.loudness = reading
             }
         }
+        capture.loudness.onUpdate = showReading
+        appLoudness.onUpdate = showReading
         capture.onStop = { [weak self] error in
             Task { @MainActor in self?.captureStopped(error) }
         }
@@ -283,6 +330,7 @@ final class AppModel {
         // Touching the volume is a good hint that sound is (about to be) playing.
         if let lastVolume, lastVolume.scalar != volume.scalar || lastVolume.muted != volume.muted { wake() }
         lastVolume = volume
+        refreshAudioApps()
         followPlayback()
         // No buffers for a while: nothing is playing.
         if Date().timeIntervalSince(lastLevelAt) > 2.5, liveSPL != nil || liveDBFS != nil {
@@ -304,8 +352,11 @@ final class AppModel {
 
         // A loudness measurement needs every second of the programme, quiet parts included.
         if loudnessRunning {
-            if captureState == .waiting { startCapture(force: true) }
-            return
+            if loudnessSource == nil {
+                if captureState == .waiting { startCapture(force: true) }
+                return
+            }
+            updateSourceTap()   // one app: its own tap; the hearing tap carries on as usual
         }
 
         if players.isEmpty {
@@ -334,22 +385,69 @@ final class AppModel {
         if fresh { loudness = .empty }
         loudnessRunning = true
         silencePausedPlayers = nil
-        capture.loudness.start(reset: fresh)
-        if !capture.isRunning { startCapture(force: true) }
-        log.info("Loudness measurement \(fresh ? "started" : "resumed", privacy: .public)")
+        activeLoudness.start(reset: fresh)
+        if loudnessSource == nil {
+            if !capture.isRunning { startCapture(force: true) }
+        } else {
+            updateSourceTap()
+        }
+        log.info("Loudness measurement \(fresh ? "started" : "resumed", privacy: .public) (\(self.loudnessSource ?? "all audio", privacy: .public))")
     }
 
     /// Pauses; the values so far stay on screen and resume from there.
     func stopLoudness() {
         loudnessRunning = false
-        capture.loudness.pause()
+        activeLoudness.pause()
+        stopSourceTap()
         log.info("Loudness measurement paused")
     }
 
     /// Clears the measurement. If it was running, it keeps running from zero.
     func resetLoudness() {
-        capture.loudness.reset()
+        activeLoudness.reset()
         loudness = loudnessRunning ? .empty : nil
+    }
+
+    /// Keeps a tap on exactly the chosen app's audio processes. Apps add processes as they go
+    /// (a new browser tab, Resolve starting playback), so this re-runs every second while measuring.
+    private func updateSourceTap() {
+        guard #available(macOS 14.2, *), usesTap, loudnessRunning, let app = loudnessSource, !sourceTapBusy else { return }
+        let objects = Set((AudioActivity.clients() ?? []).filter { AudioActivity.appName($0.pid) == app }.map(\.object))
+        guard objects != sourceTapProcesses || (sourceTap == nil && !objects.isEmpty) else { return }
+        sourceTapProcesses = objects
+        sourceTapBusy = true
+        let old = sourceTap
+        sourceTap = nil
+        Task {
+            await old?.stop()
+            if !objects.isEmpty {
+                let tap = SystemAudioTap(processes: Array(objects), loudness: appLoudness)
+                do {
+                    try await tap.start()
+                    sourceTap = tap
+                    log.info("Loudness source tap on \(app, privacy: .public) (\(objects.count) process(es))")
+                } catch {
+                    log.error("Loudness source tap failed: \(error.localizedDescription, privacy: .public)")
+                    sourceTapProcesses = []
+                }
+            }
+            sourceTapBusy = false
+        }
+    }
+
+    private func stopSourceTap() {
+        let old = sourceTap
+        sourceTap = nil
+        sourceTapProcesses = []
+        Task { await old?.stop() }
+    }
+
+    private func refreshAudioApps() {
+        guard #available(macOS 14.2, *), usesTap else { return }
+        let names = Set((AudioActivity.clients() ?? []).compactMap { AudioActivity.appName($0.pid) })
+            .filter { !$0.isEmpty && !$0.hasPrefix("com.apple.") }
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        if names != audioApps { audioApps = names }
     }
 
     /// Resume a silence pause right away (panel opened, volume or device changed).
@@ -373,20 +471,9 @@ final class AppModel {
         }
     }
 
-    /// "Google Chrome" rather than "Google Chrome Helper (Renderer)": the outermost .app in the process path.
     private static func appNames(_ pids: Set<pid_t>) -> [String] {
-        var names = Set<String>()
-        for pid in pids where pid > 0 {
-            var buffer = [CChar](repeating: 0, count: 4096)
-            guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { continue }
-            let path = String(cString: buffer)
-            if let app = path.split(separator: "/").first(where: { $0.hasSuffix(".app") }) {
-                names.insert(String(app.dropLast(4)))
-            } else {
-                names.insert((path as NSString).lastPathComponent)
-            }
-        }
-        return names.sorted()
+        guard #available(macOS 14.2, *) else { return [] }
+        return Set(pids.compactMap(AudioActivity.appName)).sorted()
     }
 
     // MARK: Devices

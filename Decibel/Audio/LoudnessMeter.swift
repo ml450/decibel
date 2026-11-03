@@ -195,9 +195,18 @@ struct TruePeakOversampler {
     }
 }
 
-/// Delivery targets for the loudness meter: two built-ins plus the user's saved custom values.
+/// A named loudness target the user created ("Podcast −16").
+struct CustomLoudnessTarget: Codable, Hashable, Identifiable {
+    var id = UUID()
+    var name: String
+    var lufs: Double
+
+    var displayName: String { name.trimmingCharacters(in: .whitespaces).isEmpty ? "Custom" : name }
+}
+
+/// Delivery targets for the loudness meter: two built-ins plus the user's own.
 enum LoudnessTarget: Hashable {
-    case social, broadcast, custom(Double)
+    case social, broadcast, custom(CustomLoudnessTarget)
 
     static let builtIn: [LoudnessTarget] = [.social, .broadcast]
 
@@ -205,7 +214,7 @@ enum LoudnessTarget: Hashable {
         switch self {
         case .social: -14
         case .broadcast: -23
-        case .custom(let v): v
+        case .custom(let t): t.lufs
         }
     }
 
@@ -214,7 +223,7 @@ enum LoudnessTarget: Hashable {
         switch self {
         case .social: return "\(value) LUFS · Social media"
         case .broadcast: return "\(value) LUFS · Broadcast (EBU R128)"
-        case .custom: return "\(value) LUFS · Custom"
+        case .custom(let t): return "\(value) LUFS · \(t.displayName)"
         }
     }
 
@@ -232,20 +241,24 @@ enum LoudnessTarget: Hashable {
         (v == v.rounded() ? String(format: "%.0f", v) : String(format: "%.1f", v)).replacingOccurrences(of: "-", with: "−")
     }
 
-    // Stored as "social", "broadcast" or "custom:-16.0" ("youtube" was the old name for social).
+    // Stored as "social", "broadcast" or "custom:<id>" ("youtube" was the old name for social).
     var storageKey: String {
         switch self {
         case .social: "social"
         case .broadcast: "broadcast"
-        case .custom(let v): "custom:\(v)"
+        case .custom(let t): "custom:\(t.id.uuidString)"
         }
     }
 
-    init(storageKey: String?) {
+    init(storageKey: String?, customs: [CustomLoudnessTarget]) {
         switch storageKey {
         case "broadcast": self = .broadcast
         case let key? where key.hasPrefix("custom:"):
-            self = Double(key.dropFirst(7)).map { .custom($0) } ?? .social
+            let rest = String(key.dropFirst(7))
+            let id = UUID(uuidString: rest)
+            let match = customs.first { $0.id == id }
+                ?? Double(rest).flatMap { value in customs.first { $0.lufs == value } }   // older "custom:-17.0"
+            self = match.map { .custom($0) } ?? .social
         default: self = .social
         }
     }
