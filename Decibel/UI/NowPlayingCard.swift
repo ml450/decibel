@@ -44,7 +44,22 @@ struct NowPlayingCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
+    @ViewBuilder
     private func controls(_ np: NowPlaying, playing: Bool) -> some View {
+        if model.isSnapshot {
+            // ImageRenderer can't draw AppKit-backed buttons; show the same glyphs.
+            HStack(spacing: 10) {
+                Image(systemName: "backward.fill")
+                Image(systemName: playing ? "pause.fill" : "play.fill").font(.system(size: 20)).frame(width: 22)
+                Image(systemName: "forward.fill")
+            }
+            .font(.system(size: 14))
+        } else {
+            buttons(np, playing: playing)
+        }
+    }
+
+    private func buttons(_ np: NowPlaying, playing: Bool) -> some View {
         HStack(spacing: 10) {
             Button(action: np.previous) { Image(systemName: "backward.fill") }
                 .help("Previous")
