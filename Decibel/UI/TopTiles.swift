@@ -22,7 +22,7 @@ struct LiveLevel: View {
                     .foregroundStyle(.tertiary)
             }
         }
-        .frame(height: 36, alignment: .leading)   // same height as the album cover next to it
+        .frame(height: NowPlayingTile.topRow, alignment: .leading)   // same height as the album cover next to it
     }
 }
 
@@ -59,6 +59,7 @@ struct DeviceTile: View {
 /// Compact player tile: artwork and controls, title, artist, progress.
 struct NowPlayingTile: View {
     @Environment(AppModel.self) private var model
+    static let topRow: CGFloat = 36
 
     var body: some View {
         let np = model.nowPlaying
@@ -69,6 +70,7 @@ struct NowPlayingTile: View {
                     Spacer(minLength: 4)
                     controls(np, playing: track.isPlaying)
                 }
+                .frame(height: Self.topRow)   // same as the device tile, so the titles line up
                 VStack(alignment: .leading, spacing: 1) {
                     Text(track.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
                     Text(track.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
