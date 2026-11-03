@@ -120,16 +120,19 @@ private struct NowHeader: View {
                 }
                 if model.volume.hasControl {
                     // Volume slider for the current output, live while dragging.
-                    HStack(spacing: 6) {
+                    HStack(spacing: 5) {
                         Image(systemName: model.volume.muted ? "speaker.slash.fill" : "speaker.fill")
                             .font(.system(size: 9))
                             .foregroundStyle(.secondary)
-                            .frame(width: 12)
                         ThinSlider(value: model.volume.muted ? 0 : model.volume.scalar,
                                    onChange: { model.setVolume($0) })
-                            .help("Volume \(Int((model.volume.scalar * 100).rounded()))%")
+                        Text(model.volume.muted ? "Muted" : "\(Int((model.volume.scalar * 100).rounded()))%")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .frame(width: 38, alignment: .leading)
                     }
-                    .frame(maxWidth: 170)
+                    .frame(maxWidth: 190)
+                    .help("Volume")
                 } else {
                     Text(volumeText).font(.caption).foregroundStyle(.secondary)
                 }
