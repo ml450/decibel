@@ -331,7 +331,7 @@ final class AppModel {
             return
         }
         let spl = dbfs + volumeDB + profile.offset
-        // Below ~20 dB(A) nothing is audible (very low volume); treat it as silence, never as "−5 dB".
+        // Below ~10 dB(A) nothing is audible (very low volume); treat it as silence, never as "−5 dB".
         guard spl >= DecibelStore.audibleFloor else {
             setLive(dbfs: dbfs, spl: nil)
             return

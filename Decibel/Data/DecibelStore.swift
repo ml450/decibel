@@ -26,7 +26,7 @@ final class DecibelStore {
     }
 
     /// Estimates below this are inaudible and left out (older versions logged some).
-    static let audibleFloor = 20.0
+    static let audibleFloor = 10.0
 
     let url: URL
     private let db: SQLiteDB
