@@ -112,25 +112,25 @@ struct NowPlayingTile: View {
 
     @ViewBuilder
     private func controls(_ np: NowPlaying, playing: Bool) -> some View {
-        let glyphs = HStack(spacing: 12) {
+        let glyphs = HStack(spacing: 7) {
             Image(systemName: "backward.fill")
-            Image(systemName: playing ? "pause.fill" : "play.fill").font(.system(size: 21)).frame(width: 20)
+            Image(systemName: playing ? "pause.fill" : "play.fill").font(.system(size: 25)).frame(width: 24)
             Image(systemName: "forward.fill")
         }
-        .font(.system(size: 14))
+        .font(.system(size: 17))
         if model.isSnapshot {
             glyphs   // ImageRenderer can't draw AppKit-backed buttons
         } else {
-            HStack(spacing: 12) {
+            HStack(spacing: 7) {
                 Button(action: np.previous) { Image(systemName: "backward.fill") }.help("Previous")
                 Button(action: np.togglePlayPause) {
-                    Image(systemName: playing ? "pause.fill" : "play.fill").font(.system(size: 21)).frame(width: 20)
+                    Image(systemName: playing ? "pause.fill" : "play.fill").font(.system(size: 25)).frame(width: 24)
                 }
                 .help(playing ? "Pause" : "Play")
                 Button(action: np.next) { Image(systemName: "forward.fill") }.help("Next")
             }
             .buttonStyle(.borderless)
-            .font(.system(size: 14))
+            .font(.system(size: 17))
             .foregroundStyle(.primary)
         }
     }
