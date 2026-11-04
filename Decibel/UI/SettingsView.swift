@@ -86,11 +86,7 @@ private struct AccentPicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Accent colour").font(.system(size: 13))
-                Spacer()
-                Text(appearance.accent.name).font(.caption).foregroundStyle(.secondary)
-            }
+            Text("Accent colour").font(.system(size: 13))
             HStack(spacing: 0) {
                 ForEach(AccentChoice.allCases) { choice in
                     let selected = appearance.accent == choice
