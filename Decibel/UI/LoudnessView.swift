@@ -280,6 +280,33 @@ private struct MeterBar: View {
     }
 }
 
+/// A soft capsule with a small chevron, like the tab switcher, instead of the stock pop-up button.
+private struct PillLabel: View {
+    let title: String
+    var symbol: String? = nil
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 5) {
+            if let symbol { Image(systemName: symbol).font(.system(size: 11, weight: .semibold)) }
+            Text(title).lineLimit(1)
+            Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)).foregroundStyle(.secondary)
+        }
+        .font(.system(size: 12, weight: .semibold))
+        .padding(.horizontal, 11)
+        .padding(.vertical, 6)
+        .background(Capsule().fill(Color.secondary.opacity(hovering ? 0.2 : 0.12)))
+        .contentShape(Capsule())
+        .onHover { hovering = $0 }
+    }
+}
+
+private extension View {
+    func pillMenu() -> some View {
+        menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+    }
+}
+
 /// Built-in and saved targets, plus "New Target…". Editing and deleting live in the inline editor.
 private struct TargetMenu: View {
     @Environment(AppModel.self) private var model
@@ -297,9 +324,9 @@ private struct TargetMenu: View {
                 withAnimation(.smooth(duration: 0.2)) { editing = CustomLoudnessTarget(name: "", lufs: -16) }
             }
         } label: {
-            Text(model.loudnessTarget.label)
+            PillLabel(title: model.loudnessTarget.label)
         }
-        .fixedSize()
+        .pillMenu()
         .help("Loudness target")
     }
 
@@ -324,10 +351,10 @@ private struct SourceMenu: View {
                 option("\(chosen) (not running)", chosen)
             }
         } label: {
-            Label(model.loudnessSource ?? "All audio",
-                  systemImage: model.loudnessSource == nil ? "speaker.wave.2" : "app.badge")
+            PillLabel(title: model.loudnessSource ?? "All audio",
+                      symbol: model.loudnessSource == nil ? "speaker.wave.2" : "app.badge")
         }
-        .fixedSize()
+        .pillMenu()
         .help("Measure all audio, or one app")
     }
 
