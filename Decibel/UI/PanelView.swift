@@ -163,9 +163,9 @@ private struct LevelsCard: View {
             HStack(spacing: 5) {
                 if let avg {
                     Image(systemName: avg >= 80 ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                        .foregroundStyle(avg >= 80 ? Theme.loud : .green)
+                        .foregroundStyle(avg >= 80 ? Theme.loud : Theme.accent)
                     Text(avg >= 80 ? "Loud" : "OK").fontWeight(.semibold)
-                        .foregroundStyle(avg >= 80 ? Theme.loud : .green)
+                        .foregroundStyle(avg >= 80 ? Theme.loud : Theme.accent)
                     Text("·").foregroundStyle(.tertiary)
                 }
                 Text(Format.duration(selected?.seconds ?? s.seconds))
@@ -239,19 +239,19 @@ private struct LevelsCard: View {
         switch range {
         case .day:
             AxisMarks(values: .stride(by: .hour, count: 6)) { _ in
-                AxisValueLabel(format: .dateTime.hour()).font(.system(size: 9, weight: .medium)).foregroundStyle(.secondary)
+                AxisValueLabel(format: .dateTime.hour()).font(.system(size: 9, weight: .medium)).foregroundStyle(Theme.accent.opacity(0.75))
             }
         case .week:
             AxisMarks(values: .stride(by: .day)) { _ in
-                AxisValueLabel(format: .dateTime.weekday(.narrow), centered: true).font(.system(size: 9, weight: .medium)).foregroundStyle(.secondary)
+                AxisValueLabel(format: .dateTime.weekday(.narrow), centered: true).font(.system(size: 9, weight: .medium)).foregroundStyle(Theme.accent.opacity(0.75))
             }
         case .month:
             AxisMarks(values: .stride(by: .day, count: 7)) { _ in
-                AxisValueLabel(format: .dateTime.day()).font(.system(size: 9, weight: .medium)).foregroundStyle(.secondary)
+                AxisValueLabel(format: .dateTime.day()).font(.system(size: 9, weight: .medium)).foregroundStyle(Theme.accent.opacity(0.75))
             }
         case .sixMonths, .year:
             AxisMarks(values: .stride(by: .month)) { _ in
-                AxisValueLabel(format: .dateTime.month(.narrow), centered: true).font(.system(size: 9, weight: .medium)).foregroundStyle(.secondary)
+                AxisValueLabel(format: .dateTime.month(.narrow), centered: true).font(.system(size: 9, weight: .medium)).foregroundStyle(Theme.accent.opacity(0.75))
             }
         }
     }

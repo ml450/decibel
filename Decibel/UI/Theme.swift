@@ -40,19 +40,21 @@ enum AccentChoice: String, CaseIterable, Identifiable {
 final class Appearance {
     static let shared = Appearance()
     /// Off for `--snapshot`, which shares the installed app's settings.
-    var persists = true
+    @ObservationIgnored var persists = true
+    /// The menu bar item isn't SwiftUI; it redraws through this.
+    @ObservationIgnored var onChange: (() -> Void)?
 
     var accent: AccentChoice = AccentChoice(rawValue: UserDefaults.standard.string(forKey: "accent") ?? "") ?? .blue {
-        didSet { if persists { UserDefaults.standard.set(accent.rawValue, forKey: "accent") } }
+        didSet { if persists { UserDefaults.standard.set(accent.rawValue, forKey: "accent") }; onChange?() }
     }
 
     /// The colour-wheel pick for `.custom`: hue around the wheel, saturation outwards; brightness stays high
     /// so the accent always reads well on the dark glass.
     var customHue: Double = UserDefaults.standard.object(forKey: "customHue") as? Double ?? 0.92 {
-        didSet { if persists { UserDefaults.standard.set(customHue, forKey: "customHue") } }
+        didSet { if persists { UserDefaults.standard.set(customHue, forKey: "customHue") }; onChange?() }
     }
     var customSaturation: Double = UserDefaults.standard.object(forKey: "customSaturation") as? Double ?? 0.65 {
-        didSet { if persists { UserDefaults.standard.set(customSaturation, forKey: "customSaturation") } }
+        didSet { if persists { UserDefaults.standard.set(customSaturation, forKey: "customSaturation") }; onChange?() }
     }
 
     var customColor: Color { Color(hue: customHue, saturation: customSaturation, brightness: 0.96) }
@@ -72,12 +74,14 @@ enum Theme {
             ? NSColor(white: 1, alpha: 0.07) : NSColor(white: 1, alpha: 0.75)
     })
 
+    /// Under 80 dB the level wears the accent; 80–90 is a yellow warning; over 90 red
+    /// (purple when the accent itself is red, so the two never blur).
     static func levelColor(_ db: Double) -> Color {
-        db < 80 ? .green : db <= 90 ? .yellow : .red
+        db < 80 ? accent : db <= 90 ? .yellow : (Appearance.shared.accent == .red ? .purple : .red)
     }
 
     static func levelNSColor(_ db: Double) -> NSColor {
-        db < 80 ? .systemGreen : db <= 90 ? .systemYellow : .systemRed
+        db < 80 ? NSColor(accent) : db <= 90 ? .systemYellow : (Appearance.shared.accent == .red ? .systemPurple : .systemRed)
     }
 }
 

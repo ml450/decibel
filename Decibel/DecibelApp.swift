@@ -105,6 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         statusItem.item.button?.target = self
         statusItem.item.button?.action = #selector(togglePanel)
         model.onLiveChange = { [weak self] in self?.updateStatusItem() }
+        Appearance.shared.onChange = { [weak self] in self?.updateStatusItem() }
         updateStatusItem()
 
         model.start()
