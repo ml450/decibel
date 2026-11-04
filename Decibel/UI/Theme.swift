@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The accent colour the user picked in Settings.
 enum AccentChoice: String, CaseIterable, Identifiable {
-    case blue, pink, magenta, orange, red, green, teal, graphite
+    case blue, pink, magenta, orange, red, green, teal, custom
 
     var id: String { rawValue }
 
@@ -16,11 +16,11 @@ enum AccentChoice: String, CaseIterable, Identifiable {
         case .red: "Red"
         case .green: "Green"
         case .teal: "Teal"
-        case .graphite: "Graphite"
+        case .custom: "Custom"
         }
     }
 
-    var color: Color {
+    @MainActor var color: Color {
         switch self {
         case .blue: Color(red: 0.30, green: 0.45, blue: 0.97)
         case .pink: Color(red: 1.00, green: 0.42, blue: 0.68)
@@ -29,7 +29,7 @@ enum AccentChoice: String, CaseIterable, Identifiable {
         case .red: Color(red: 0.96, green: 0.30, blue: 0.27)
         case .green: Color(red: 0.22, green: 0.76, blue: 0.40)
         case .teal: Color(red: 0.18, green: 0.68, blue: 0.80)
-        case .graphite: Color(red: 0.55, green: 0.56, blue: 0.60)
+        case .custom: Appearance.shared.customColor
         }
     }
 }
@@ -45,6 +45,17 @@ final class Appearance {
     var accent: AccentChoice = AccentChoice(rawValue: UserDefaults.standard.string(forKey: "accent") ?? "") ?? .blue {
         didSet { if persists { UserDefaults.standard.set(accent.rawValue, forKey: "accent") } }
     }
+
+    /// The colour-wheel pick for `.custom`: hue around the wheel, saturation outwards; brightness stays high
+    /// so the accent always reads well on the dark glass.
+    var customHue: Double = UserDefaults.standard.object(forKey: "customHue") as? Double ?? 0.92 {
+        didSet { if persists { UserDefaults.standard.set(customHue, forKey: "customHue") } }
+    }
+    var customSaturation: Double = UserDefaults.standard.object(forKey: "customSaturation") as? Double ?? 0.65 {
+        didSet { if persists { UserDefaults.standard.set(customSaturation, forKey: "customSaturation") } }
+    }
+
+    var customColor: Color { Color(hue: customHue, saturation: customSaturation, brightness: 0.96) }
 }
 
 @MainActor
