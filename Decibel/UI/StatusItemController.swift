@@ -40,6 +40,7 @@ final class StatusItemController {
 
         label.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
         label.alphaValue = 0
+        label.alignment = .right                            // the number always hugs the ear
         label.autoresizingMask = [.minXMargin]              // stays next to the ear as the item widens
         button.addSubview(label)
     }
@@ -61,6 +62,7 @@ final class StatusItemController {
         let widthChanged = max(2, text.count) != max(2, label.stringValue.count)
         label.stringValue = text
         label.textColor = color
+        if tween == nil { layoutLabel(offset: slide * (1 - revealed)) }   // new text, new width: re-hug the ear
         if !visible {
             reveal(true)
         } else if widthChanged {
