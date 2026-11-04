@@ -67,30 +67,49 @@ struct LoudnessTab: View {
 
             Card {
                 Spacer(minLength: 8)
-                VStack(spacing: 2) {
-                    Text("INTEGRATED")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text(r?.integrated.map(Self.number) ?? "–")
-                            .font(.system(size: 56, weight: .semibold, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundStyle(r?.integrated.map { Self.color($0 - goal) } ?? .secondary)
-                            .contentTransition(.numericText())
-                        if r?.integrated != nil {
-                            Text("LUFS").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
+                Group {
+                    if r == nil {
+                        // Nothing measured yet: the card is one big Start button.
+                        VStack(spacing: 10) {
+                            RoundButton(symbol: "play.fill", size: 72, prominent: true) { model.startLoudness() }
+                            Text("Start measuring").font(.system(size: 13, weight: .medium)).foregroundStyle(.secondary)
+                        }
+                    } else {
+                        VStack(spacing: 2) {
+                            Text("INTEGRATED")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                                Text(r?.integrated.map(Self.number) ?? "–")
+                                    .font(.system(size: 56, weight: .semibold, design: .rounded))
+                                    .monospacedDigit()
+                                    .foregroundStyle(r?.integrated.map { Self.color($0 - goal) } ?? .secondary)
+                                    .contentTransition(.numericText())
+                                if r?.integrated != nil {
+                                    Text("LUFS").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
+                                }
+                            }
+                            let note = verdict(r, target, goal)
+                            if !note.isEmpty {
+                                Text(note)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.center)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(maxWidth: 240)
+                            }
+                            HStack(spacing: 14) {
+                                RoundButton(symbol: model.loudnessRunning ? "pause.fill" : "play.fill", size: 44,
+                                            prominent: true) {
+                                    model.loudnessRunning ? model.stopLoudness() : model.startLoudness()
+                                }
+                                RoundButton(symbol: "arrow.counterclockwise", size: 44) { model.resetLoudness() }
+                            }
+                            .padding(.top, 14)
                         }
                     }
-                    let note = verdict(r, target, goal)
-                    if !note.isEmpty {
-                        Text(note)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: 240)
-                    }
                 }
+                .transition(.opacity)
                 .frame(maxWidth: .infinity)
                 Spacer(minLength: 12)
 
@@ -106,27 +125,6 @@ struct LoudnessTab: View {
             }
             .frame(maxHeight: .infinity)
 
-            HStack(spacing: 8) {
-                Button {
-                    model.loudnessRunning ? model.stopLoudness() : model.startLoudness()
-                } label: {
-                    Label(model.loudnessRunning ? "Pause" : (r == nil ? "Start" : "Resume"),
-                          systemImage: model.loudnessRunning ? "pause.fill" : "play.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.accent)
-
-                Button {
-                    model.resetLoudness()
-                } label: {
-                    Text("Reset").frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .tint(.primary)
-                .disabled(r == nil)
-            }
-            .controlSize(.large)
         }
         .padding(12)
     }
@@ -277,6 +275,30 @@ private struct MeterBar: View {
         if let ceiling { return value > ceiling ? Theme.loud : Theme.accent }
         guard let target else { return Theme.accent }
         return value > target + 1 ? Theme.loud : value >= target - 1 ? Theme.safe : Theme.accent
+    }
+}
+
+/// A round icon button: accent-filled for the main action, soft grey otherwise.
+private struct RoundButton: View {
+    let symbol: String
+    let size: CGFloat
+    var prominent = false
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: size * 0.36, weight: .semibold))
+                .foregroundStyle(prominent ? Color.white : Color.primary)
+                .offset(x: symbol == "play.fill" ? size * 0.03 : 0)   // optically centre the triangle
+                .frame(width: size, height: size)
+                .background(Circle().fill(prominent ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Color.secondary.opacity(0.15))))
+                .brightness(hovering ? 0.06 : 0)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
     }
 }
 
