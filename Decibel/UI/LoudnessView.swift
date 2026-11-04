@@ -81,12 +81,15 @@ struct LoudnessTab: View {
                             Text("LUFS").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
                         }
                     }
-                    Text(verdict(r, target, goal))
+                    let note = verdict(r, target, goal)
+                    if !note.isEmpty {
+                        Text(note)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: 240)
+                    }
                 }
                 .frame(maxWidth: .infinity)
                 Spacer(minLength: 12)
@@ -143,10 +146,7 @@ struct LoudnessTab: View {
     }
 
     private func verdict(_ r: LoudnessReading?, _ target: LoudnessTarget, _ goal: Double) -> String {
-        guard let r else {
-            return model.loudnessSource.map { "Press Start, then play from the beginning. Only \($0) is measured." }
-                ?? "Press Start, then play from the beginning. Mute other apps meanwhile."
-        }
+        guard let r else { return "" }
         guard let integrated = r.integrated else {
             return model.loudnessRunning ? "Listening… values appear after a few seconds of sound." : "No sound measured."
         }
