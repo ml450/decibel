@@ -46,16 +46,8 @@ struct SettingsPage: View {
                     row("Updates") { UpdateStatus() }
                     Divider()
                     row("Share Decibel") {
-                        Menu("Share") {
-                            Button("Copy Link") { ShareDecibel.copyLink() }
-                            Divider()
-                            Button("Messages") { ShareDecibel.share(via: .composeMessage) }
-                            Button("Mail") { ShareDecibel.share(via: .composeEmail) }
-                            Button("AirDrop") { ShareDecibel.share(via: .sendViaAirDrop) }
-                        }
-                        .menuStyle(.button)
-                        .buttonStyle(.bordered)
-                        .frame(width: Self.buttonWidth)
+                        // A plain button like the others (a SwiftUI Menu ignores the width); it pops up the menu.
+                        actionButton("Share…") { ShareDecibel.showMenu() }
                     }
                     Divider()
                     row("Quit Decibel") {

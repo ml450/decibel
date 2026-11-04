@@ -78,6 +78,17 @@ enum ShareDecibel {
         NSPasteboard.general.setString(Uninstaller.downloadPage.absoluteString, forType: .string)
     }
 
+    /// Copy Link / Messages / Mail / AirDrop, at the pointer.
+    static func showMenu() {
+        let menu = NSMenu()
+        menu.addItem(ClosureMenuItem("Copy Link") { copyLink() })
+        menu.addItem(.separator())
+        menu.addItem(ClosureMenuItem("Messages") { share(via: .composeMessage) })
+        menu.addItem(ClosureMenuItem("Mail") { share(via: .composeEmail) })
+        menu.addItem(ClosureMenuItem("AirDrop") { share(via: .sendViaAirDrop) })
+        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+    }
+
     static func share(via name: NSSharingService.Name) {
         guard let service = NSSharingService(named: name) else { return copyLink() }
         service.subject = "Decibel"
@@ -89,4 +100,19 @@ enum ShareDecibel {
             copyLink()
         }
     }
+}
+
+/// NSMenuItem that runs a closure.
+final class ClosureMenuItem: NSMenuItem {
+    private let handler: () -> Void
+
+    init(_ title: String, handler: @escaping () -> Void) {
+        self.handler = handler
+        super.init(title: title, action: #selector(run), keyEquivalent: "")
+        target = self
+    }
+
+    required init(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    @objc private func run() { handler() }
 }
