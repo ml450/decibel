@@ -42,9 +42,8 @@ struct SettingsPage: View {
                 }
 
                 section("Decibel \(model.updater.currentVersion)") {
-                    row("Updates") {
-                        UpdateStatus()
-                    }
+                    // Same row everywhere: name on the left, one equally sized button on the right.
+                    row("Updates") { UpdateStatus() }
                     Divider()
                     row("Share Decibel") {
                         Menu("Share") {
@@ -54,18 +53,19 @@ struct SettingsPage: View {
                             Button("Mail") { ShareDecibel.share(via: .composeEmail) }
                             Button("AirDrop") { ShareDecibel.share(via: .sendViaAirDrop) }
                         }
-                        .fixedSize()
+                        .menuStyle(.button)
+                        .buttonStyle(.bordered)
+                        .frame(width: Self.buttonWidth)
                     }
                     Divider()
-                    HStack {
-                        Button("Uninstall Decibel…", role: .destructive) { Uninstaller.confirmAndUninstall(model: model) }
-                            .buttonStyle(.borderless)
-                            .foregroundStyle(.red)
-                        Spacer()
-                        Button("Quit Decibel") { NSApp.terminate(nil) }
+                    row("Quit Decibel") {
+                        actionButton("Quit") { NSApp.terminate(nil) }
                             .keyboardShortcut("q")
                     }
-                    .font(.system(size: 13))
+                    Divider()
+                    row("Uninstall Decibel") {
+                        actionButton("Uninstall…", destructive: true) { Uninstaller.confirmAndUninstall(model: model) }
+                    }
                 }
             }
             .padding(12)
@@ -86,13 +86,24 @@ struct SettingsPage: View {
         }
     }
 
+    static let buttonWidth: CGFloat = 96
+
     private func row(_ title: String, @ViewBuilder trailing: () -> some View) -> some View {
         HStack {
             Text(title).font(.system(size: 13))
             Spacer()
-            trailing()
+            trailing().controlSize(.small)
         }
         .frame(minHeight: 24)
+    }
+
+    private func actionButton(_ title: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(role: destructive ? .destructive : nil, action: action) {
+            Text(title).frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .foregroundStyle(destructive ? AnyShapeStyle(.red) : AnyShapeStyle(.primary))
+        .frame(width: Self.buttonWidth)
     }
 
     private func toggleRow(_ title: String, isOn: Binding<Bool>) -> some View {
@@ -142,21 +153,32 @@ private struct UpdateStatus: View {
 
     var body: some View {
         let updater = model.updater
-        switch updater.state {
-        case .checking:
-            ProgressView().controlSize(.small)
-        case .installing:
-            HStack(spacing: 6) { ProgressView().controlSize(.small); Text("Installing…").foregroundStyle(.secondary) }
-                .font(.caption)
-        case .available(let version):
-            Button("Install \(version)") { Task { await updater.install(beforeQuit: { model.flush() }) } }
-                .buttonStyle(.borderedProminent).tint(Theme.accent).controlSize(.small)
-        case .upToDate:
-            Text("Up to date").font(.caption).foregroundStyle(.secondary)
-        case .failed:
-            Button("Try again") { Task { await updater.check() } }.controlSize(.small)
-        case .idle:
-            Button("Check now") { Task { await updater.check() } }.controlSize(.small)
+        Group {
+            switch updater.state {
+            case .checking:
+                ProgressView().controlSize(.small)
+            case .installing:
+                Text("Installing…").font(.caption).foregroundStyle(.secondary)
+            case .available(let version):
+                button("Install \(version)", prominent: true) { await updater.install(beforeQuit: { model.flush() }) }
+            case .upToDate:
+                Text("Up to date").font(.caption).foregroundStyle(.secondary)
+            case .failed:
+                button("Try again") { await updater.check() }
+            case .idle:
+                button("Check now") { await updater.check() }
+            }
+        }
+        .frame(width: SettingsPage.buttonWidth, height: 22)
+    }
+
+    @ViewBuilder
+    private func button(_ title: String, prominent: Bool = false, action: @escaping () async -> Void) -> some View {
+        let b = Button { Task { await action() } } label: { Text(title).frame(maxWidth: .infinity) }
+        if prominent {
+            b.buttonStyle(.borderedProminent).tint(Theme.accent)
+        } else {
+            b.buttonStyle(.bordered)
         }
     }
 }
