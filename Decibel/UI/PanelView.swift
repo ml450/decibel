@@ -43,6 +43,7 @@ struct PanelView: View {
             }
         }
         .animation(.smooth(duration: 0.3), value: model.page)
+        .tint(Theme.accent)   // switches and other system controls follow the chosen accent too
         .frame(width: Self.width)
         .fixedSize(horizontal: false, vertical: true)
         // No background of our own: the popover's material (arrow included) shows through as one surface.
