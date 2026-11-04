@@ -103,7 +103,9 @@ struct LoudnessTab: View {
                                             prominent: true) {
                                     model.loudnessRunning ? model.stopLoudness() : model.startLoudness()
                                 }
-                                RoundButton(symbol: "arrow.counterclockwise", size: 44) { model.resetLoudness() }
+                                RoundButton(symbol: "arrow.counterclockwise", size: 44) {
+                                    withAnimation(.smooth(duration: 0.25)) { model.resetLoudness() }
+                                }
                             }
                             .padding(.top, 14)
                         }

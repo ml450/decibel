@@ -420,10 +420,11 @@ final class AppModel {
         log.info("Loudness measurement paused")
     }
 
-    /// Clears the measurement. If it was running, it keeps running from zero.
+    /// Stops and clears the measurement, back to the Start button.
     func resetLoudness() {
+        if loudnessRunning { stopLoudness() }
         activeLoudness.reset()
-        loudness = loudnessRunning ? .empty : nil
+        loudness = nil
     }
 
     /// Keeps a tap on exactly the chosen app's audio processes. Apps add processes as they go
