@@ -163,9 +163,9 @@ private struct LevelsCard: View {
             HStack(spacing: 5) {
                 if let avg {
                     Image(systemName: avg >= 80 ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                        .foregroundStyle(avg >= 80 ? Theme.loud : Theme.accent)
+                        .foregroundStyle(avg >= 80 ? Theme.loud : Theme.safe)
                     Text(avg >= 80 ? "Loud" : "OK").fontWeight(.semibold)
-                        .foregroundStyle(avg >= 80 ? Theme.loud : Theme.accent)
+                        .foregroundStyle(avg >= 80 ? Theme.loud : Theme.safe)
                     Text("·").foregroundStyle(.tertiary)
                 }
                 Text(Format.duration(selected?.seconds ?? s.seconds))

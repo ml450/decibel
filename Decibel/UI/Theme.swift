@@ -74,14 +74,18 @@ enum Theme {
             ? NSColor(white: 1, alpha: 0.07) : NSColor(white: 1, alpha: 0.75)
     })
 
-    /// Under 80 dB the level wears the accent; 80–90 is a yellow warning; over 90 red
+    /// "Fine" levels: classic green with the default Decibel blue, otherwise the chosen accent.
+    static var safe: Color { Appearance.shared.accent == .blue ? .green : accent }
+
+    /// Under 80 dB the level is `safe`; 80–90 is a yellow warning; over 90 red
     /// (purple when the accent itself is red, so the two never blur).
     static func levelColor(_ db: Double) -> Color {
-        db < 80 ? accent : db <= 90 ? .yellow : (Appearance.shared.accent == .red ? .purple : .red)
+        db < 80 ? safe : db <= 90 ? .yellow : (Appearance.shared.accent == .red ? .purple : .red)
     }
 
     static func levelNSColor(_ db: Double) -> NSColor {
-        db < 80 ? NSColor(accent) : db <= 90 ? .systemYellow : (Appearance.shared.accent == .red ? .systemPurple : .systemRed)
+        db < 80 ? (Appearance.shared.accent == .blue ? .systemGreen : NSColor(accent))
+            : db <= 90 ? .systemYellow : (Appearance.shared.accent == .red ? .systemPurple : .systemRed)
     }
 }
 
