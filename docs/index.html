@@ -42,14 +42,15 @@
   .btn:active { transform: scale(.98); }
   .btn svg { width: 20px; height: 20px; }
 
-  .hero { text-align: center; padding: 120px 0 0; }
+  .hero { text-align: center; padding-top: 120px; }
   .hero .icon { width: 160px; height: 160px; filter: drop-shadow(0 30px 60px rgba(77,115,247,.25)); }
   .eyebrow { display: inline-block; color: var(--accent-hover); font-weight: 600; margin: 28px 0 4px; min-height: 1.5em; }
   .eyebrow:hover { text-decoration: underline; }
   h1 { font-size: clamp(64px, 13vw, 128px); line-height: 1; letter-spacing: -.045em; margin: 0; font-weight: 700; }
   .tagline { font-size: clamp(22px, 3.2vw, 28px); color: #a1a1a6; font-weight: 500; letter-spacing: -.01em;
              margin: 24px 0 44px; }
-  .meta { color: var(--muted); font-size: 14px; margin-top: 22px; }
+  .meta { color: var(--muted); font-size: 14px; margin-top: 22px; text-wrap: balance; }
+  .meta span { white-space: nowrap; }   /* wrap only between the parts */
 
   .shot { display: flex; justify-content: center; padding: 100px 0 160px; perspective: 1600px; }
   /* The screenshot tilts toward the pointer (see script); --rx/--ry/--gx/--gy are set from JS. */
@@ -105,7 +106,7 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
     Last ned for Mac
   </a>
-  <p class="meta" id="meta">macOS 14 Sonoma eller nyere · Apple silicon</p>
+  <p class="meta" id="meta"><span>macOS 14 Sonoma eller nyere</span> · <span>Apple silicon</span></p>
 </header>
 
 <div class="shot"><div class="tilt" id="tilt"><img src="panel.png" alt="Decibel-panelet: live nivå og volum, det som spilles, snitt per dag og enheter" width="340" height="578"><div class="glare"></div></div></div>
@@ -141,7 +142,7 @@
 <footer>
   <div class="wrap">
     <img src="icon-64.png" alt="">
-    <span>Grove folk</span>
+    <span>Lagd for grove folk</span>
     <span class="right">
       <a href="https://github.com/ml450/decibel/releases">Hva er nytt</a>
       <a href="https://github.com/ml450/decibel">GitHub</a>
@@ -194,7 +195,12 @@
       const zip = r.assets.find(a => a.name === 'Decibel.zip');
       const mb = zip ? (zip.size / 1e6).toLocaleString('nb-NO', { maximumFractionDigits: 1 }) + ' MB · ' : '';
       document.getElementById('eyebrow').textContent = 'Nytt i ' + version + ' ›';
-      document.getElementById('meta').textContent = `Versjon ${version} · ${mb}macOS 14 Sonoma eller nyere · Apple silicon`;
+      const parts = [`Versjon ${version}`, ...(mb ? [mb.replace(' · ', '')] : []), 'macOS 14 Sonoma eller nyere', 'Apple silicon'];
+      const meta = document.getElementById('meta');
+      meta.replaceChildren(...parts.flatMap((t, i) => {
+        const span = document.createElement('span'); span.textContent = t;
+        return i ? [' · ', span] : [span];
+      }));
     } catch { /* offline or rate-limited: keep the static text */ }
   })();
 </script>
