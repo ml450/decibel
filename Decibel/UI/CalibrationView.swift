@@ -9,7 +9,7 @@ struct PageHeader: View {
         ZStack {
             Text(title).font(.headline)
             HStack {
-                Button { model.page = .home } label: {
+                Button { model.goBack() } label: {
                     Label("Back", systemImage: "chevron.left").labelStyle(.titleAndIcon)
                 }
                 .buttonStyle(.borderless)
@@ -110,7 +110,7 @@ struct CalibrationPage: View {
                 Button("Save") {
                     guard let m = measured, let n = noiseLevel else { return }
                     if model.calibrate(measuredDB: m, noiseDBFS: n) {
-                        model.page = .home
+                        model.goBack()
                     } else {
                         error = "Turn the volume up and unmute before saving."
                     }

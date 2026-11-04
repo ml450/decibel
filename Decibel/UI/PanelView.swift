@@ -34,6 +34,7 @@ struct PanelView: View {
                 }
                 .transition(Self.pageTransition)
             case .calibrate: CalibrationPage().transition(Self.pageTransition)
+            case .settings: SettingsPage().transition(Self.pageTransition)
             case .device(let uid):
                 Group {
                     if let profile = model.profiles[uid] { DeviceEditPage(profile: profile) } else { HomePage() }
@@ -368,7 +369,6 @@ private struct FooterBar: View {
             Spacer()
             if model.isSnapshot {
                 // ImageRenderer can't draw AppKit-backed buttons and menus.
-                FooterIcon(symbol: "gauge.with.needle", size: 14)
                 FooterIcon(symbol: "gearshape", size: 16)
             } else {
                 controls
@@ -382,35 +382,12 @@ private struct FooterBar: View {
     private var controls: some View {
         UpdateButton()
 
-        Button { model.page = .calibrate } label: {
-            FooterIcon(symbol: "gauge.with.needle", size: 14)
-        }
-        .buttonStyle(.borderless)
-        .help("Calibrate device")
-        .disabled(model.device == nil)
-
-        Menu {
-            Toggle("Launch at Login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
-            Toggle("Show Level in Menu Bar", isOn: Binding(get: { model.showLevelInMenuBar }, set: { model.showLevelInMenuBar = $0 }))
-            // Plain items (no ShareLink icon), so everything lines up under the checkmarks.
-            Menu("Share Decibel") {
-                Button("Copy Link") { ShareDecibel.copyLink() }
-                Divider()
-                Button("Messages") { ShareDecibel.share(via: .composeMessage) }
-                Button("Mail") { ShareDecibel.share(via: .composeEmail) }
-                Button("AirDrop") { ShareDecibel.share(via: .sendViaAirDrop) }
-            }
-            Divider()
-            Button("Uninstall Decibel…") { Uninstaller.confirmAndUninstall(model: model) }
-            Button("Quit Decibel") { NSApp.terminate(nil) }
-                .keyboardShortcut("q")
-        } label: {
+        Button { model.page = .settings } label: {
             FooterIcon(symbol: "gearshape", size: 16)
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
+        .buttonStyle(.borderless)
         .help("Settings")
+        .keyboardShortcut(",", modifiers: .command)
     }
 }
 

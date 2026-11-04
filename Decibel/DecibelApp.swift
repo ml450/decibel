@@ -65,6 +65,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 model.range = range
             }
             if args.contains("--page"), args.contains("calibrate") { model.page = .calibrate }
+            if args.contains("--page"), args.contains("settings") { model.page = .settings }
+            if let a = args.firstIndex(of: "--accent"), a + 1 < args.count, let c = AccentChoice(rawValue: args[a + 1]) {
+                Appearance.shared.persists = false
+                Appearance.shared.accent = c
+            }
             if args.contains("--page"), args.contains("loudness") {
                 model.page = .loudness
                 if args.contains("--demo") { model.applyDemoLoudness() }

@@ -1,11 +1,59 @@
 import AppKit
 import SwiftUI
 
+/// The accent colour the user picked in Settings.
+enum AccentChoice: String, CaseIterable, Identifiable {
+    case blue, pink, magenta, orange, red, green, teal, graphite
+
+    var id: String { rawValue }
+
+    var name: String {
+        switch self {
+        case .blue: "Decibel blue"
+        case .pink: "Pink"
+        case .magenta: "Magenta"
+        case .orange: "Orange"
+        case .red: "Red"
+        case .green: "Green"
+        case .teal: "Teal"
+        case .graphite: "Graphite"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .blue: Color(red: 0.30, green: 0.45, blue: 0.97)
+        case .pink: Color(red: 1.00, green: 0.42, blue: 0.68)
+        case .magenta: Color(red: 0.84, green: 0.28, blue: 0.86)
+        case .orange: Color(red: 1.00, green: 0.58, blue: 0.10)
+        case .red: Color(red: 0.96, green: 0.30, blue: 0.27)
+        case .green: Color(red: 0.22, green: 0.76, blue: 0.40)
+        case .teal: Color(red: 0.18, green: 0.68, blue: 0.80)
+        case .graphite: Color(red: 0.55, green: 0.56, blue: 0.60)
+        }
+    }
+}
+
+/// Holds the accent so every view that reads `Theme.accent` redraws when it changes (Observation tracks
+/// the read, even through the static property).
+@MainActor @Observable
+final class Appearance {
+    static let shared = Appearance()
+    /// Off for `--snapshot`, which shares the installed app's settings.
+    var persists = true
+
+    var accent: AccentChoice = AccentChoice(rawValue: UserDefaults.standard.string(forKey: "accent") ?? "") ?? .blue {
+        didSet { if persists { UserDefaults.standard.set(accent.rawValue, forKey: "accent") } }
+    }
+}
+
+@MainActor
 enum Theme {
 
-    /// Accent colour (Health app "Hearing" blue).
-    static let accent = Color(red: 0.30, green: 0.45, blue: 0.97)
-    static let loud = Color.orange
+    /// Accent colour, chosen in Settings (default: Health app "Hearing" blue).
+    static var accent: Color { Appearance.shared.accent.color }
+    /// "Too loud" stays distinguishable from the accent, even when the accent is orange.
+    static var loud: Color { Appearance.shared.accent == .orange ? .red : .orange }
 
     /// Cards sit on the popover's material, so they are a translucent lift rather than an opaque fill.
     static let card = Color(nsColor: NSColor(name: nil) { appearance in

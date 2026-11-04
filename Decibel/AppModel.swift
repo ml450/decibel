@@ -9,7 +9,7 @@ import os
 let log = Logger(subsystem: "local.decibel.app", category: "decibel")
 
 enum PanelPage: Equatable {
-    case home, calibrate, loudness, device(String)
+    case home, calibrate, loudness, settings, device(String)
 }
 
 enum CaptureState: Equatable {
@@ -37,6 +37,13 @@ final class AppModel {
     var range: TimeRange = .week { didSet { reloadStats() } }
 
     var page: PanelPage = .home
+    /// Where "Back" goes from a sub-page (Settings opens Calibrate and wants to come back to itself).
+    var backPage: PanelPage = .home
+
+    func goBack() {
+        page = backPage
+        backPage = .home
+    }
 
     // Loudness (LUFS) measurement for delivery checks
     private(set) var loudness: LoudnessReading?
