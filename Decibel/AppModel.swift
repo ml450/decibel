@@ -17,6 +17,8 @@ enum CaptureState: Equatable {
     case starting, needsPermission, running, waiting, failed(String)
 
     var isHealthy: Bool { self == .running || self == .waiting }
+    /// Needs the user: no permission, or capture failed.
+    var needsAttention: Bool { !isHealthy && self != .starting }
 }
 
 @MainActor @Observable

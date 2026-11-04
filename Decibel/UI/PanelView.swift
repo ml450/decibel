@@ -89,7 +89,8 @@ extension HomePage {
                 NowPlayingTile().frame(maxHeight: .infinity)
             }
             .fixedSize(horizontal: false, vertical: true)
-            if !model.captureState.isHealthy && !model.isSnapshot { CaptureStatusCard() }
+            // Only problems get a card. "Starting" lasts a moment and would make the panel jump.
+            if model.captureState.needsAttention && !model.isSnapshot { CaptureStatusCard() }
             LevelsCard()
             DevicesCard()
         }
@@ -431,7 +432,7 @@ private struct FooterStatus: View {
                 Text(message).lineLimit(1).foregroundStyle(.secondary)
             case .idle:
                 switch model.captureState {
-                case .running, .waiting:
+                case .running, .waiting, .starting:
                     // Just the version; the footer only speaks up when something needs attention.
                     Text("Decibel \(updater.currentVersion)").foregroundStyle(.secondary)
                 default:
