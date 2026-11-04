@@ -122,12 +122,11 @@ struct NowPlayingTile: View {
             glyphs   // ImageRenderer can't draw AppKit-backed buttons
         } else {
             HStack(spacing: 7) {
-                Button(action: np.previous) { Image(systemName: "backward.fill") }.help("Previous")
+                Button(action: np.previous) { Image(systemName: "backward.fill") }
                 Button(action: np.togglePlayPause) {
                     Image(systemName: playing ? "pause.fill" : "play.fill").font(.system(size: 25)).frame(width: 24)
                 }
-                .help(playing ? "Pause" : "Play")
-                Button(action: np.next) { Image(systemName: "forward.fill") }.help("Next")
+                Button(action: np.next) { Image(systemName: "forward.fill") }
             }
             .buttonStyle(.borderless)
             .font(.system(size: 17))
