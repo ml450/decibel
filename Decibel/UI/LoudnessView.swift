@@ -146,7 +146,7 @@ struct LoudnessTab: View {
     private func verdict(_ r: LoudnessReading?, _ target: LoudnessTarget, _ goal: Double) -> String {
         guard let r else { return "" }
         guard let integrated = r.integrated else {
-            return model.loudnessRunning ? "Listening… values appear after a few seconds of sound." : "No sound measured."
+            return model.loudnessRunning ? "Listening…" : "No sound measured."
         }
         let diff = integrated - goal
         let time = " · \(Self.duration(r.seconds))"
