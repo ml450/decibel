@@ -25,7 +25,10 @@ enum CaptureState: Equatable {
 final class AppModel {
     // Live
     private(set) var device: OutputDevice?
-    private(set) var volume = VolumeInfo.unity
+    private(set) var volume = VolumeInfo.unity {
+        // Muting while it's quiet must still shrink the menu bar box.
+        didSet { if volume.isSilent != oldValue.isSilent { onLiveChange?() } }
+    }
     private(set) var liveDBFS: Double?
     private(set) var liveSPL: Double?
     private(set) var captureState: CaptureState = .starting

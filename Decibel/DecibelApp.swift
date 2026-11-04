@@ -242,7 +242,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             statusItem?.update(text: String(format: "%.0f", spl), color: Theme.levelNSColor(spl),
                                toolTip: String(format: "%.0f dB(A) on %@", spl, model.device?.name ?? ""))
         } else {
-            statusItem?.update(text: nil, color: .secondaryLabelColor, toolTip: "Decibel")
+            // Sound on but a quiet second: keep the box. Muted or nothing playing: back to the ear.
+            let keep = model.showLevelInMenuBar && model.captureState == .running && !model.volume.isSilent
+            statusItem?.update(text: nil, color: .secondaryLabelColor, toolTip: "Decibel", keepBox: keep)
         }
     }
 

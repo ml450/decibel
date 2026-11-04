@@ -22,6 +22,7 @@ final class StatusItemController {
     private let iconWidth: CGFloat = 28
     private let slide: CGFloat = 8
     private var visible = false
+    private var keepBox = false
 
     init() {
         item = NSStatusBar.system.statusItem(withLength: iconWidth)
@@ -44,13 +45,20 @@ final class StatusItemController {
     }
 
     /// `text` nil = quiet (only the ear is shown).
-    func update(text: String?, color: NSColor, toolTip: String) {
+    /// `keepBox`: a short silence while sound is on (between songs). The number fades, but the box keeps
+    /// its width; it only shrinks to the ear when muted or nothing plays.
+    func update(text: String?, color: NSColor, toolTip: String, keepBox: Bool = false) {
         item.button?.toolTip = toolTip
+        self.keepBox = keepBox
         guard let text else {
-            if visible { reveal(false) }
+            if visible {
+                reveal(false)
+            } else if !keepBox, !holdWidth, tween == nil, item.length > iconWidth + 0.5 {
+                animate(revealTo: 0, lengthTo: iconWidth, duration: 0.24, easeOut: false)
+            }
             return
         }
-        let widthChanged = text.count != label.stringValue.count
+        let widthChanged = max(2, text.count) != max(2, label.stringValue.count)
         label.stringValue = text
         label.textColor = color
         if !visible {
@@ -62,7 +70,13 @@ final class StatusItemController {
         }
     }
 
-    private var expandedLength: CGFloat { iconWidth + ceil(label.intrinsicContentSize.width) + 2 }
+    /// Room for two digits at least, so 1 dB and 22 dB get the same box; only 100+ widens it.
+    private var numberWidth: CGFloat {
+        let two = ("88" as NSString).size(withAttributes: [.font: label.font as Any]).width
+        return ceil(max(two, label.intrinsicContentSize.width))
+    }
+
+    private var expandedLength: CGFloat { iconWidth + numberWidth + 2 }
 
     /// 0 = only the ear, 1 = number fully shown.
     private var revealed: CGFloat = 0
@@ -88,7 +102,7 @@ final class StatusItemController {
         // While the panel is open the item keeps its width: macOS re-centres status items when they
         // resize, which made the ear jump on mute/unmute. The number just fades in and out in place.
         animate(revealTo: show ? 1 : 0,
-                lengthTo: show ? expandedLength : (holdWidth ? item.length : iconWidth),
+                lengthTo: show ? expandedLength : (holdWidth || keepBox ? item.length : iconWidth),
                 duration: show ? 0.3 : 0.24, easeOut: show)
     }
 
@@ -130,7 +144,7 @@ final class StatusItemController {
     /// Set while the panel is open; releasing it shrinks the item if the number is gone.
     var holdWidth = false {
         didSet {
-            guard !holdWidth, !visible, item.length > iconWidth + 0.5 else { return }
+            guard !holdWidth, !visible, !keepBox, item.length > iconWidth + 0.5 else { return }
             reveal(false)
         }
     }
