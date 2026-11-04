@@ -218,14 +218,19 @@ enum LoudnessTarget: Hashable {
         }
     }
 
-    var label: String {
-        let value = LoudnessTarget.format(lufs)
+    var title: String {
         switch self {
-        case .social: return "\(value) LUFS · Social media"
-        case .broadcast: return "\(value) LUFS · Broadcast (EBU R128)"
-        case .custom(let t): return "\(value) LUFS · \(t.displayName)"
+        case .social: "Social media"
+        case .broadcast: "Broadcast"
+        case .custom(let t): t.displayName
         }
     }
+
+    /// "−14 LUFS", shown greyed after the title.
+    var value: String { "\(LoudnessTarget.format(lufs)) LUFS" }
+
+    /// Menu item text.
+    var label: String { "\(title)   \(value)" }
 
     /// Follows "N LU louder than …" in the verdict.
     var tooLoudNote: String {

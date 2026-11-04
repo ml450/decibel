@@ -280,9 +280,10 @@ private struct MeterBar: View {
     }
 }
 
-/// A soft capsule with a small chevron, like the tab switcher, instead of the stock pop-up button.
+/// A soft capsule, like the tab switcher, instead of the stock pop-up button.
 private struct PillLabel: View {
     let title: String
+    var detail: String? = nil
     var symbol: String? = nil
     @State private var hovering = false
 
@@ -290,7 +291,7 @@ private struct PillLabel: View {
         HStack(spacing: 5) {
             if let symbol { Image(systemName: symbol).font(.system(size: 11, weight: .semibold)) }
             Text(title).lineLimit(1)
-            Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)).foregroundStyle(.secondary)
+            if let detail { Text(detail).foregroundStyle(.secondary).lineLimit(1) }
         }
         .font(.system(size: 12, weight: .semibold))
         .padding(.horizontal, 11)
@@ -324,7 +325,7 @@ private struct TargetMenu: View {
                 withAnimation(.smooth(duration: 0.2)) { editing = CustomLoudnessTarget(name: "", lufs: -16) }
             }
         } label: {
-            PillLabel(title: model.loudnessTarget.label)
+            PillLabel(title: model.loudnessTarget.title, detail: model.loudnessTarget.value)
         }
         .pillMenu()
         .help("Loudness target")
