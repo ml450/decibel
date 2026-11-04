@@ -40,6 +40,8 @@ struct LoudnessTab: View {
     @Environment(AppModel.self) private var model
     /// The custom target being created or edited in the inline row (nil = row hidden).
     @State private var editing: CustomLoudnessTarget?
+    /// Lets the big Start button glide into the Pause button.
+    @Namespace private var controls
 
     var body: some View {
         let r = model.loudness
@@ -71,9 +73,13 @@ struct LoudnessTab: View {
                     if r == nil {
                         // Nothing measured yet: the card is one big Start button.
                         VStack(spacing: 10) {
-                            RoundButton(symbol: "play.fill", size: 72, prominent: true) { model.startLoudness() }
+                            RoundButton(symbol: "play.fill", size: 72, prominent: true) {
+                                withAnimation(.smooth(duration: 0.35)) { model.startLoudness() }
+                            }
+                            .matchedGeometryEffect(id: "primary", in: controls)
                             Text("Start measuring").font(.system(size: 13, weight: .medium)).foregroundStyle(.secondary)
                         }
+                        .transition(.opacity)
                     } else {
                         VStack(spacing: 2) {
                             Text("INTEGRATED")
@@ -103,15 +109,16 @@ struct LoudnessTab: View {
                                             prominent: true) {
                                     model.loudnessRunning ? model.stopLoudness() : model.startLoudness()
                                 }
+                                .matchedGeometryEffect(id: "primary", in: controls)
                                 RoundButton(symbol: "arrow.counterclockwise", size: 44) {
                                     withAnimation(.smooth(duration: 0.25)) { model.resetLoudness() }
                                 }
                             }
                             .padding(.top, 14)
                         }
+                        .transition(.opacity)
                     }
                 }
-                .transition(.opacity)
                 .frame(maxWidth: .infinity)
                 Spacer(minLength: 12)
 
