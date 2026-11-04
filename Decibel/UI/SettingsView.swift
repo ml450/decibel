@@ -75,15 +75,15 @@ struct SettingsPage: View {
         SectionCard(title: title) { content() }
     }
 
-    static let buttonWidth: CGFloat = 96
+    static let buttonWidth: CGFloat = 84
 
     private func row(_ title: String, @ViewBuilder trailing: () -> some View) -> some View {
         HStack {
             Text(title).font(.system(size: 13))
             Spacer()
-            trailing().controlSize(.small)
+            trailing().controlSize(.regular)
         }
-        .frame(minHeight: 24)
+        .frame(minHeight: 28)
     }
 
     private func actionButton(_ title: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {
@@ -218,7 +218,7 @@ private struct UpdateStatus: View {
                 button("Check now") { await updater.check() }
             }
         }
-        .frame(width: SettingsPage.buttonWidth, height: 22)
+        .frame(width: SettingsPage.buttonWidth, height: 26)
     }
 
     @ViewBuilder
