@@ -94,16 +94,22 @@ final class Updater {
             }
             try await run("/usr/bin/codesign", ["--verify", "--deep", "--strict", newApp.path])
 
-            // Replace the running bundle (macOS allows this), then relaunch once we have quit.
-            let target = Bundle.main.bundleURL
+            // Replace the running bundle (macOS allows this), then relaunch once we have quit. When the app runs
+            // from somewhere we can't write (opened straight from Downloads, so macOS runs a read-only
+            // translocated copy, or from a disk image), install into Applications instead.
+            let target = Self.installTarget(running: Bundle.main.bundleURL)
+            let fm = FileManager.default
+            try? fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
             let backup = work.appendingPathComponent("Decibel-old.app")
-            try FileManager.default.moveItem(at: target, to: backup)
+            let hadOld = fm.fileExists(atPath: target.path)
+            if hadOld { try fm.moveItem(at: target, to: backup) }
             do {
-                try FileManager.default.moveItem(at: newApp, to: target)
+                try fm.moveItem(at: newApp, to: target)
             } catch {
-                try? FileManager.default.moveItem(at: backup, to: target)
+                if hadOld { try? fm.moveItem(at: backup, to: target) }
                 throw error
             }
+            log.info("Updated \(target.path, privacy: .public)")
 
             let pid = ProcessInfo.processInfo.processIdentifier
             let relaunch = Process()
@@ -123,6 +129,18 @@ final class Updater {
     }
 
     // MARK: Helpers
+
+    /// Where the update goes: over the running app when that folder is writable, otherwise /Applications
+    /// (or ~/Applications if that isn't writable either).
+    nonisolated static func installTarget(running app: URL,
+                                          writable: (String) -> Bool = { FileManager.default.isWritableFile(atPath: $0) }) -> URL {
+        let folder = app.deletingLastPathComponent().path
+        let translocated = app.path.contains("/AppTranslocation/")
+        let mounted = app.path.hasPrefix("/Volumes/")
+        if !translocated, !mounted, writable(folder), writable(app.path) { return app }
+        if writable("/Applications") { return URL(fileURLWithPath: "/Applications/Decibel.app") }
+        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/Decibel.app")
+    }
 
     nonisolated static func isNewer(_ a: String, than b: String) -> Bool {
         let pa = a.split(separator: ".").map { Int($0) ?? 0 }

@@ -135,6 +135,19 @@ enum SelfTest {
               String(format: "%.2f dBTP (sample peak −9.03)", tp.truePeakNow ?? .nan))
 
         // 8. Update version comparison
+        do {
+            let all: (String) -> Bool = { _ in true }
+            let normal = URL(fileURLWithPath: "/Applications/Decibel.app")
+            let downloads = URL(fileURLWithPath: "/Users/x/Downloads/Decibel.app")
+            let translocated = URL(fileURLWithPath: "/private/var/folders/ab/T/AppTranslocation/1234/d/Decibel.app")
+            let dmg = URL(fileURLWithPath: "/Volumes/Decibel/Decibel.app")
+            let ok = Updater.installTarget(running: normal, writable: all) == normal
+                && Updater.installTarget(running: downloads, writable: all) == downloads
+                && Updater.installTarget(running: translocated, writable: all).path == "/Applications/Decibel.app"
+                && Updater.installTarget(running: dmg, writable: all).path == "/Applications/Decibel.app"
+                && Updater.installTarget(running: downloads, writable: { $0 == "/Applications" }).path == "/Applications/Decibel.app"
+            check("update target", ok, "in place when writable; translocated, disk image or read-only go to /Applications")
+        }
         check("update versions", Updater.isNewer("1.1", than: "1.0") && Updater.isNewer("1.0.1", than: "1.0")
               && Updater.isNewer("1.10", than: "1.9") && !Updater.isNewer("1.0", than: "1.0.0")
               && !Updater.isNewer("0.9", than: "1.0"), "1.1 > 1.0, 1.0.1 > 1.0, 1.10 > 1.9, 1.0 = 1.0.0")
