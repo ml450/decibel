@@ -78,7 +78,7 @@ enum ShareDecibel {
         NSPasteboard.general.setString(Uninstaller.downloadPage.absoluteString, forType: .string)
     }
 
-    /// Copy Link / Messages / Mail / AirDrop, at the pointer.
+    /// Copy Link / Messages / Mail / AirDrop, beside the panel (level with the click) rather than on top of it.
     static func showMenu() {
         let menu = NSMenu()
         menu.addItem(ClosureMenuItem("Copy Link") { copyLink() })
@@ -86,7 +86,10 @@ enum ShareDecibel {
         menu.addItem(ClosureMenuItem("Messages") { share(via: .composeMessage) })
         menu.addItem(ClosureMenuItem("Mail") { share(via: .composeEmail) })
         menu.addItem(ClosureMenuItem("AirDrop") { share(via: .sendViaAirDrop) })
-        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+        let click = NSEvent.mouseLocation
+        let panel = NSApp.keyWindow?.frame
+        let point = panel.map { NSPoint(x: $0.maxX + 6, y: click.y + 12) } ?? click
+        menu.popUp(positioning: nil, at: point, in: nil)
     }
 
     static func share(via name: NSSharingService.Name) {
