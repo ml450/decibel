@@ -64,7 +64,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             if let r = args.firstIndex(of: "--range"), r + 1 < args.count, let range = TimeRange(rawValue: args[r + 1]) {
                 model.range = range
             }
-            if args.contains("--page"), args.contains("calibrate") { model.page = .calibrate }
             if args.contains("--page"), args.contains("settings") { model.page = .settings }
             if let a = args.firstIndex(of: "--accent"), a + 1 < args.count, let c = AccentChoice(rawValue: args[a + 1]) {
                 Appearance.shared.persists = false
@@ -93,9 +92,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let host = NSHostingController(rootView: PanelView().environment(model))
         host.sizingOptions = [.preferredContentSize]   // the panel grows/shrinks with its content
         popover.contentViewController = host
-        model.setPanelPinned = { [weak self] pinned in
-            self?.popover.behavior = pinned ? .applicationDefined : .transient
-        }
 
         statusItem = StatusItemController()
         statusItem.onResize = { [weak self] in
@@ -203,7 +199,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // click another menu bar item (Control Center, volume…). Close on any click outside us instead.
         outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, self.popover.behavior == .transient else { return }   // pinned while calibrating
+                guard let self else { return }
                 self.popover.performClose(nil)
             }
         }

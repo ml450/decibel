@@ -9,7 +9,7 @@ import os
 let log = Logger(subsystem: "local.decibel.app", category: "decibel")
 
 enum PanelPage: Equatable {
-    case home, calibrate, loudness, settings, device(String)
+    case home, loudness, settings, device(String)
 }
 
 enum CaptureState: Equatable {
@@ -37,7 +37,7 @@ final class AppModel {
     var range: TimeRange = .week { didSet { reloadStats() } }
 
     var page: PanelPage = .home
-    /// Where "Back" goes from a sub-page (Settings opens Calibrate and wants to come back to itself).
+    /// Where "Back" goes from a sub-page.
     var backPage: PanelPage = .home
 
     func goBack() {
@@ -128,8 +128,6 @@ final class AppModel {
     private(set) var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     @ObservationIgnored var onLiveChange: (() -> Void)?
-    /// Keeps the menu bar panel open while calibrating (you'll be looking at a meter elsewhere).
-    @ObservationIgnored var setPanelPinned: ((Bool) -> Void)?
     @ObservationIgnored let store: DecibelStore
     @ObservationIgnored let updater = Updater()
     @ObservationIgnored let nowPlaying = NowPlaying()
@@ -565,16 +563,6 @@ final class AppModel {
         do { try store.save(profile) } catch { log.error("Saving profile failed: \(error.localizedDescription, privacy: .public)") }
     }
 
-    /// offset = measured − (A-weighted noise level + volume in dB)
-    func calibrate(measuredDB: Double, noiseDBFS: Double) -> Bool {
-        guard let device, var profile = profiles[device.uid] else { return false }
-        let v = OutputDeviceMonitor.volume(of: device.id)
-        guard !v.isSilent, let volumeDB = v.decibels else { return false }
-        profile.offset = measuredDB - (noiseDBFS + volumeDB)
-        profile.calibrated = true
-        save(profile)
-        return true
-    }
 
     // MARK: Persistence & stats
 

@@ -100,15 +100,6 @@ enum SelfTest {
             check("storage", false, error.localizedDescription)
         }
 
-        // 6. Calibration noise
-        let noise = PinkNoisePlayer.generate(seconds: 4, sampleRate: sr, dbfs: PinkNoisePlayer.levelDBFS)
-        let raw = LevelMeter.dbfs(of: [noise])
-        let weighted = LevelMeter.aWeightedLevel(of: [noise], sampleRate: sr)
-        check("pink noise at −20 dBFS", abs(raw + 20) < 0.05, String(format: "%.2f dBFS, A-weighted %.2f dBFS", raw, weighted))
-        // With 75 dB measured at −12 dB volume, the stored offset must reproduce 75 dB.
-        let offset = 75 - (weighted + -12)
-        check("calibration offset round-trip", abs((weighted - 12 + offset) - 75) < 1e-9, String(format: "offset %.1f dB", offset))
-
         // 7. Loudness (EBU Tech 3341 reference cases)
         func loudness(_ parts: [(dbfs: Double, seconds: Double)], frequency: Double = 1000, phase: Double = 0) -> LoudnessMeter {
             let meter = LoudnessMeter(sampleRate: sr)

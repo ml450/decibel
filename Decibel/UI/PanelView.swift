@@ -33,7 +33,6 @@ struct PanelView: View {
                     FooterBar()
                 }
                 .transition(Self.pageTransition)
-            case .calibrate: CalibrationPage().transition(Self.pageTransition)
             case .settings: SettingsPage().transition(Self.pageTransition)
             case .device(let uid):
                 Group {

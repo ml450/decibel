@@ -17,7 +17,7 @@ extension SystemAudioCapture: SystemAudioSource {}
 
 /// Reads the system audio mix through a Core Audio process tap (macOS 14.2+).
 /// Needs only the "System Audio Recording Only" permission, so macOS shows no screen-sharing indicator.
-/// Our own process (calibration noise) is excluded. Audio is never stored.
+/// Decibel's own process is excluded. Audio is never stored.
 @available(macOS 14.2, *)
 final class SystemAudioTap: SystemAudioSource {
     struct TapError: LocalizedError {

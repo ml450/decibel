@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Everything that used to live in the gear menu, plus calibration and the accent colour.
+/// Everything that used to live in the gear menu, plus the accent colour.
 struct SettingsPage: View {
     @Environment(AppModel.self) private var model
 
@@ -19,26 +19,6 @@ struct SettingsPage: View {
 
                 section("Appearance") {
                     AccentPicker()
-                }
-
-                section("Calibration") {
-                    Button {
-                        model.backPage = .settings
-                        model.page = .calibrate
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text("Calibrate \(model.device?.name ?? "device")")
-                                    .font(.system(size: 13, weight: .medium)).lineLimit(1)
-                                Text(calibrationStatus).font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(model.device == nil)
                 }
 
                 section("Decibel \(model.updater.currentVersion)") {
@@ -64,10 +44,6 @@ struct SettingsPage: View {
         }
     }
 
-    private var calibrationStatus: String {
-        guard let p = model.currentProfile else { return "No output device" }
-        return p.calibrated ? "Calibrated" : "Using the default estimate for \(p.kind.label.lowercased())"
-    }
 
     // MARK: Building blocks
 

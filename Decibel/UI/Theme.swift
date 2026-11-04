@@ -123,7 +123,7 @@ struct Card<Content: View>: View {
     }
 }
 
-/// A card with a small grey heading, as used by Settings and Calibrate.
+/// A card with a small grey heading, as used by Settings.
 struct SectionCard<Content: View>: View {
     let title: String
     @ViewBuilder var content: Content
