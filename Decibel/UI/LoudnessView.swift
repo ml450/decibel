@@ -104,10 +104,23 @@ struct LoudnessTab: View {
                                     .fixedSize(horizontal: false, vertical: true)
                                     .frame(maxWidth: 240)
                             }
+                            if let notice = model.loudnessNotice {
+                                Label(notice, systemImage: "pause.circle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 7)
+                                    .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                                    .padding(.top, 10)
+                                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                            }
                             HStack(spacing: 14) {
                                 RoundButton(symbol: model.loudnessRunning ? "pause.fill" : "play.fill", size: 44,
                                             prominent: true) {
-                                    model.loudnessRunning ? model.stopLoudness() : model.startLoudness()
+                                    withAnimation(.smooth(duration: 0.25)) {
+                                        model.loudnessRunning ? model.stopLoudness() : model.startLoudness()
+                                    }
                                 }
                                 .matchedGeometryEffect(id: "primary", in: controls)
                                 RoundButton(symbol: "arrow.counterclockwise", size: 44) {
@@ -369,7 +382,7 @@ private struct TargetMenu: View {
 
     private func option(_ target: LoudnessTarget) -> some View {
         Toggle(target.label, isOn: Binding(get: { model.loudnessTarget == target },
-                                           set: { if $0 { model.loudnessTarget = target } }))
+                                           set: { if $0 { withAnimation(.smooth(duration: 0.25)) { model.loudnessTarget = target } } }))
     }
 }
 

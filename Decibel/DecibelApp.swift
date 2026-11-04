@@ -72,6 +72,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             if args.contains("--page"), args.contains("loudness") {
                 model.page = .loudness
                 if args.contains("--demo") { model.applyDemoLoudness() }
+                if args.contains("--notice") {
+                    model.loudnessNotice = "Paused because you changed the target. Resume to continue, or reset to start over."
+                }
             }
             model.reloadStats()
             // Stand-in for the popover material, which ImageRenderer can't draw.

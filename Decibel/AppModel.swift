@@ -60,8 +60,17 @@ final class AppModel {
     }
     var loudnessTarget = LoudnessTarget(storageKey: UserDefaults.standard.string(forKey: "loudnessTarget"),
                                         customs: AppModel.loadCustomTargets()) {
-        didSet { UserDefaults.standard.set(loudnessTarget.storageKey, forKey: "loudnessTarget") }
+        didSet {
+            UserDefaults.standard.set(loudnessTarget.storageKey, forKey: "loudnessTarget")
+            // Switching mid-measurement: pause, so the user decides whether to carry on or start over.
+            if loudnessTarget != oldValue, loudnessRunning {
+                stopLoudness()
+                loudnessNotice = "Paused because you changed the target. Resume to continue, or reset to start over."
+            }
+        }
     }
+    /// A short note in the loudness card, e.g. why the measurement paused. Cleared on resume or reset.
+    var loudnessNotice: String?
     var targetLUFS: Double { loudnessTarget.lufs }
 
     /// Where the loudness measurement listens: nil = all audio, otherwise one app by name ("DaVinci Resolve").
@@ -401,6 +410,7 @@ final class AppModel {
 
     /// Starts or resumes the loudness measurement; the tap stays on while it runs.
     func startLoudness() {
+        loudnessNotice = nil
         let fresh = loudness == nil
         if fresh { loudness = .empty }
         loudnessRunning = true
@@ -424,6 +434,7 @@ final class AppModel {
 
     /// Stops and clears the measurement, back to the Start button.
     func resetLoudness() {
+        loudnessNotice = nil
         if loudnessRunning { stopLoudness() }
         activeLoudness.reset()
         loudness = nil
