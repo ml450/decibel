@@ -46,81 +46,60 @@ struct LoudnessTab: View {
         let target = model.loudnessTarget
         let goal = model.targetLUFS
 
-        VStack(alignment: .leading, spacing: 8) {
-            // What to measure against, in the same rows as Settings.
-            SectionCard(title: "Measure") {
-                row("Target") {
-                    HStack(spacing: 4) {
-                        if case .custom(let current) = target, editing == nil {
-                            Button { withAnimation(.smooth(duration: 0.2)) { editing = current } } label: {
-                                Image(systemName: "pencil")
-                            }
-                            .buttonStyle(.borderless)
-                            .foregroundStyle(.secondary)
-                        }
-                        TargetMenu(editing: $editing)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                TargetMenu(editing: $editing)
+                if case .custom(let current) = target, editing == nil {
+                    Button { withAnimation(.smooth(duration: 0.2)) { editing = current } } label: {
+                        Image(systemName: "pencil")
                     }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
                 }
-                if model.canPickLoudnessSource {
-                    Divider()
-                    row("Source") { SourceMenu() }
-                }
-                if let draft = editing {
-                    Divider()
-                    CustomTargetEditor(draft: draft, editing: $editing)
-                        .id(draft.id)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                }
+                Spacer(minLength: 8)
+                if model.canPickLoudnessSource { SourceMenu() }
+            }
+            if let draft = editing {
+                Card { CustomTargetEditor(draft: draft, editing: $editing) }
+                    .id(draft.id)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
             Card {
-                // Headline number, like Average on the Hearing tab.
-                VStack(alignment: .leading, spacing: 0) {
+                Spacer(minLength: 8)
+                VStack(spacing: 2) {
                     Text("INTEGRATED")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.secondary)
-                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text(r?.integrated.map(Self.number) ?? "–")
-                            .font(.system(size: 30, weight: .semibold, design: .rounded))
+                            .font(.system(size: 56, weight: .semibold, design: .rounded))
                             .monospacedDigit()
-                            .foregroundStyle(r?.integrated.map { Self.color($0 - goal) } ?? Color.secondary.opacity(0.5))
+                            .foregroundStyle(r?.integrated.map { Self.color($0 - goal) } ?? .secondary)
                             .contentTransition(.numericText())
-                        Text("LUFS").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
-                    }
-                }
-                Text(verdict(r, target, goal))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, -6)
-
-                HStack(alignment: .top, spacing: 16) {
-                    // The bars take whatever height the tab has to spare.
-                    GeometryReader { geo in
-                        let barHeight = max(84, geo.size.height - Meter.labelHeight)
-                        HStack(alignment: .top, spacing: 10) {
-                            MeterScale(target: goal, height: barHeight)
-                            MeterBar(label: "M", value: r?.momentary, target: goal, height: barHeight)
-                            MeterBar(label: "S", value: r?.shortTerm, target: goal, height: barHeight)
-                            MeterBar(label: "TP", value: r?.truePeak, target: nil, ceiling: -1, height: barHeight)
+                        if r?.integrated != nil {
+                            Text("LUFS").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
                         }
                     }
-                    .frame(width: 22 + 3 * 16 + 3 * 10)
-                    .frame(minHeight: 100)
-
-                    VStack(spacing: 0) {
-                        stat("Short-term", r?.shortTerm, unit: "LUFS")
-                        Divider()
-                        stat("Short-term max", r?.shortTermMax, unit: "LUFS")
-                        Divider()
-                        stat("Range", r?.range, unit: "LU")
-                        Divider()
-                        stat("True peak", r?.truePeak, unit: "dBTP", warn: (r?.truePeak ?? -100) > -1)
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.top, Meter.labelHeight - 4)
+                    Text(verdict(r, target, goal))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: 240)
                 }
-                .padding(.top, 4)
+                .frame(maxWidth: .infinity)
+                Spacer(minLength: 12)
+
+                LiveBar(value: r?.shortTerm, target: goal)
+
+                Divider().padding(.vertical, 4)
+
+                HStack(alignment: .top, spacing: 0) {
+                    stat("Max", r?.shortTermMax, unit: "LUFS")
+                    stat("Range", r?.range, unit: "LU")
+                    stat("True peak", r?.truePeak, unit: "dBTP", warn: (r?.truePeak ?? -100) > -1)
+                }
             }
             .frame(maxHeight: .infinity)
 
@@ -144,45 +123,30 @@ struct LoudnessTab: View {
                 .tint(.primary)
                 .disabled(r == nil)
             }
-            .controlSize(.regular)
-
-            Text(model.loudnessSource.map { "Press Start, then play from the beginning. Only \($0) is measured." }
-                 ?? "Press Start, then play from the beginning. All audio is measured, so mute other apps.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            .controlSize(.large)
         }
         .padding(12)
     }
 
-    private func row(_ title: String, @ViewBuilder trailing: () -> some View) -> some View {
-        HStack {
-            Text(title).font(.system(size: 13))
-            Spacer()
-            trailing().controlSize(.regular)
-        }
-        .frame(minHeight: 28)
-    }
-
     private func stat(_ title: String, _ value: Double?, unit: String, warn: Bool = false) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 3) {
-            Text(title).font(.system(size: 12)).foregroundStyle(.secondary)
-            Spacer(minLength: 4)
-            if let value {
-                Text(Self.number(value))
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+        VStack(alignment: .leading, spacing: 1) {
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(value.map(Self.number) ?? "–")
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(warn ? Theme.loud : .primary)
-                Text(unit).font(.system(size: 10)).foregroundStyle(.secondary)
-            } else {
-                Text("–").foregroundStyle(.tertiary)
+                    .foregroundStyle(value == nil ? .secondary : warn ? Theme.loud : .primary)
+                if value != nil { Text(unit).font(.system(size: 10)).foregroundStyle(.secondary) }
             }
         }
-        .frame(height: 30)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func verdict(_ r: LoudnessReading?, _ target: LoudnessTarget, _ goal: Double) -> String {
-        guard let r else { return "Not measured yet." }
+        guard let r else {
+            return model.loudnessSource.map { "Press Start, then play from the beginning. Only \($0) is measured." }
+                ?? "Press Start, then play from the beginning. Mute other apps meanwhile."
+        }
         guard let integrated = r.integrated else {
             return model.loudnessRunning ? "Listening… values appear after a few seconds of sound." : "No sound measured."
         }
@@ -208,6 +172,42 @@ struct LoudnessTab: View {
     static func duration(_ seconds: Double) -> String {
         let s = Int(seconds)
         return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60) : String(format: "%d:%02d", s / 60, s % 60)
+    }
+}
+
+/// Short-term loudness as one horizontal bar, with a tick at the target.
+private struct LiveBar: View {
+    let value: Double?
+    let target: Double
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Text("Short-term").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Text(value.map(LoudnessTab.number) ?? "–")
+                    .font(.caption.weight(.semibold)).monospacedDigit()
+                    .foregroundStyle(value == nil ? .secondary : .primary)
+            }
+            GeometryReader { geo in
+                let w = geo.size.width
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.secondary.opacity(0.15))
+                    Capsule().fill(color)
+                        .frame(width: value.map { Meter.y($0, w) } ?? 0)
+                        .animation(.linear(duration: 0.15), value: value)
+                    Rectangle().fill(Color.primary.opacity(0.8))
+                        .frame(width: 2, height: 12)
+                        .offset(x: Meter.y(target, w) - 1)
+                }
+            }
+            .frame(height: 8)
+        }
+    }
+
+    private var color: Color {
+        guard let value else { return Theme.accent }
+        return value > target + 1 ? Theme.loud : value >= target - 1 ? Theme.safe : Theme.accent
     }
 }
 
