@@ -179,11 +179,11 @@ private struct UpdateStatus: View {
             case .checking:
                 ProgressView().controlSize(.small)
             case .installing:
-                Text("Installing…").font(.caption).foregroundStyle(.secondary)
+                Text("Installing…").font(.system(size: 13)).foregroundStyle(.secondary)
             case .available(let version):
                 button("Install \(version)", prominent: true) { await updater.install(beforeQuit: { model.flush() }) }
             case .upToDate:
-                Text("Up to date").font(.caption).foregroundStyle(.secondary)
+                Text("Up to date").font(.system(size: 13)).fixedSize().foregroundStyle(.secondary)
             case .failed:
                 button("Try again") { await updater.check() }
             case .idle:
