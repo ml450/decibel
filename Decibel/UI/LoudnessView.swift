@@ -122,14 +122,18 @@ struct LoudnessTab: View {
                 .frame(maxWidth: .infinity)
                 Spacer(minLength: 12)
 
-                LiveBar(value: r?.shortTerm, target: goal)
+                // The same readings as DaVinci Resolve's loudness meter.
+                VStack(spacing: 12) {
+                    LiveBar(title: "Short", value: r?.shortTerm, target: goal)
+                    LiveBar(title: "Short Max", value: r?.shortTermMax, target: goal)
+                    LiveBar(title: "Integrated", value: r?.integrated, target: goal)
+                }
 
                 Divider().padding(.vertical, 4)
 
                 HStack(alignment: .top, spacing: 0) {
-                    stat("Max", r?.shortTermMax, unit: "LUFS")
-                    stat("Range", r?.range, unit: "LU")
-                    stat("True peak", r?.truePeak, unit: "dBTP", warn: (r?.truePeak ?? -100) > -1)
+                    stat("Range (LU)", r?.range, unit: "LU")
+                    stat("True Peak", r?.truePeak, unit: "dBTP", warn: (r?.truePeak ?? -100) > -1)
                 }
             }
             .frame(maxHeight: .infinity)
@@ -182,15 +186,16 @@ struct LoudnessTab: View {
     }
 }
 
-/// Short-term loudness as one horizontal bar, with a tick at the target.
+/// One loudness reading as a horizontal bar, with a tick at the target.
 private struct LiveBar: View {
+    let title: String
     let value: Double?
     let target: Double
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
-                Text("Short-term").font(.caption).foregroundStyle(.secondary)
+                Text(title).font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Text(value.map(LoudnessTab.number) ?? "–")
                     .font(.caption.weight(.semibold)).monospacedDigit()
