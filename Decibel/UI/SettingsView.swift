@@ -80,10 +80,7 @@ struct SettingsPage: View {
     // MARK: Building blocks
 
     private func section(_ title: String, @ViewBuilder content: () -> some View) -> some View {
-        Card {
-            Text(title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-            content()
-        }
+        SectionCard(title: title) { content() }
     }
 
     static let buttonWidth: CGFloat = 96

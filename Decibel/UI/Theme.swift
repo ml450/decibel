@@ -104,6 +104,19 @@ struct Card<Content: View>: View {
     }
 }
 
+/// A card with a small grey heading, as used by Settings and Calibrate.
+struct SectionCard<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        Card {
+            Text(title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            content
+        }
+    }
+}
+
 struct CardTitle: View {
     let title: String
     let symbol: String

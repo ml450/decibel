@@ -39,17 +39,22 @@ struct CalibrationPage: View {
         VStack(spacing: 0) {
             PageHeader(title: "Calibrate Device")
             Divider()
-            VStack(alignment: .leading, spacing: 18) {
-                    HStack(spacing: 10) {
+            VStack(spacing: 8) {
+                SectionCard(title: "Device") {
+                    HStack(spacing: 12) {
                         DeviceIcon(symbol: profile?.symbol ?? "speaker.wave.2.fill", size: 32)
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text(profile?.name ?? "No output device").font(.headline)
-                            Text(model.volume.muted ? "Muted" : "Volume \(Int((model.volume.scalar * 100).rounded()))%")
-                                .font(.caption).foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(profile?.name ?? "No output device")
+                                .font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                            Text(deviceStatus(profile))
+                                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         }
+                        Spacer(minLength: 0)
                     }
+                }
 
-                    VStack(alignment: .leading, spacing: 14) {
+                SectionCard(title: "Steps") {
+                    VStack(alignment: .leading, spacing: 10) {
                         step(1, model.volume.isSilent
                              ? "Turn the sound on and set the volume to where you usually listen."
                              : "Set the volume to where you usually listen.")
@@ -59,43 +64,44 @@ struct CalibrationPage: View {
                              : "Open the Noise app on your Apple Watch, or a sound meter app on your phone, and hold it where your head usually is.")
                         step(4, "Type in the number it shows and press Save.")
                     }
-                    .font(.callout)
+                    .font(.system(size: 13))
+                }
 
-                    Card {
-                        Button { toggle() } label: {
-                            Label(playing ? "Stop Test Sound" : "Play Test Sound", systemImage: playing ? "stop.fill" : "play.fill")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent).tint(Theme.accent)
-                        .controlSize(.large)
+                SectionCard(title: "Measure") {
+                    Button { toggle() } label: {
+                        Label(playing ? "Stop Test Sound" : "Play Test Sound", systemImage: playing ? "stop.fill" : "play.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent).tint(Theme.accent)
+                    .controlSize(.large)
 
-                        HStack {
-                            Text("The meter shows")
-                            Spacer()
-                            TextField("72", value: $measured, format: .number.precision(.fractionLength(0...1)))
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 70)
-                                .multilineTextAlignment(.trailing)
-                            Text("dB").foregroundStyle(.secondary)
-                        }
+                    HStack {
+                        Text("The meter shows").font(.system(size: 13))
+                        Spacer()
+                        TextField("72", value: $measured, format: .number.precision(.fractionLength(0...1)))
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 64)
+                            .multilineTextAlignment(.trailing)
+                        Text("dB").font(.system(size: 13)).foregroundStyle(.secondary)
+                    }
 
-                        if let p = profile, let n = noiseLevel, let v = volumeDB {
-                            Divider()
-                            let estimate = n + v + p.offset
-                            row("Decibel estimates", String(format: "%.0f dB", estimate))
-                            if let m = measured {
-                                let change = m - estimate
-                                Text(abs(change) < 0.5
-                                     ? "That matches. Nothing to change."
-                                     : String(format: "Decibel will %@ its estimates by %.0f dB.", change > 0 ? "raise" : "lower", abs(change)))
-                                    .font(.callout).foregroundStyle(.secondary)
-                            }
+                    if let p = profile, let n = noiseLevel, let v = volumeDB {
+                        Divider()
+                        let estimate = n + v + p.offset
+                        row("Decibel estimates", String(format: "%.0f dB", estimate))
+                        if let m = measured {
+                            let change = m - estimate
+                            Text(abs(change) < 0.5
+                                 ? "That matches. Nothing to change."
+                                 : String(format: "Decibel will %@ its estimates by %.0f dB.", change > 0 ? "raise" : "lower", abs(change)))
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                     }
 
                     if let error { Text(error).foregroundStyle(.red).font(.caption) }
+                }
             }
-            .padding(14)
+            .padding(12)
             Divider()
             HStack {
                 if let p = profile, p.calibrated {
@@ -143,6 +149,12 @@ struct CalibrationPage: View {
                 self.error = "Couldn't play noise: \(error.localizedDescription)"
             }
         }
+    }
+
+    private func deviceStatus(_ p: DeviceProfile?) -> String {
+        guard let p else { return "" }
+        let volume = model.volume.muted ? "Muted" : "Volume \(Int((model.volume.scalar * 100).rounded()))%"
+        return volume + " · " + (p.calibrated ? "Calibrated" : "Default estimate")
     }
 
     private func step(_ n: Int, _ text: String) -> some View {
