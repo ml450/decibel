@@ -42,6 +42,8 @@ final class AppModel {
     var range: TimeRange = .week {
         didSet { periodOffset = 0; reloadStats() }
     }
+    /// Devices with any listening at all, so the Devices list doesn't change with the period shown.
+    private(set) var devicesEverUsed: Set<String> = []
     /// 0 = the current period; −1 the one before, and so on (scrolled in the chart).
     private(set) var periodOffset = 0
 
@@ -630,6 +632,7 @@ final class AppModel {
     func reloadStats() {
         do {
             summary = try store.summary(for: range, offset: periodOffset)
+            devicesEverUsed = try store.devicesEverUsed()
             weeklyDose = try store.weeklyDose()
         } catch {
             log.error("Loading stats failed: \(error.localizedDescription, privacy: .public)")

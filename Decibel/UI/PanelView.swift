@@ -455,13 +455,13 @@ private struct DevicesCard: View {
 
     var body: some View {
         let usage = model.summary.devices
-        // Only devices used in this range, plus the one playing now.
+        // Every device you've listened on, plus the one playing now; numbers are for the range shown.
         // Order: in use, then connected, then the rest; most listened first within each group.
         let rank = { (p: DeviceProfile) -> Int in
             p.uid == model.device?.uid ? 0 : model.connectedUIDs.contains(p.uid) ? 1 : 2
         }
         let rows = model.profiles.values
-            .filter { usage[$0.uid] != nil || $0.uid == model.device?.uid }
+            .filter { usage[$0.uid] != nil || model.devicesEverUsed.contains($0.uid) || $0.uid == model.device?.uid }
             .sorted {
                 (rank($1), usage[$0.uid]?.seconds ?? 0, $1.name) > (rank($0), usage[$1.uid]?.seconds ?? 0, $0.name)
             }

@@ -132,6 +132,15 @@ final class DecibelStore {
             devices: devices.compactMapValues { acc in acc.leq.map { DeviceUsage(seconds: acc.seconds, avgDB: $0) } })
     }
 
+    /// Every device that has ever been listened on.
+    func devicesEverUsed() throws -> Set<String> {
+        var uids: Set<String> = []
+        try db.query("SELECT DISTINCT device_uid FROM minutes WHERE avg_db >= \(Self.audibleFloor)", []) { r in
+            uids.insert(r.string(0))
+        }
+        return uids
+    }
+
     /// When listening was first recorded (nil = never); scrolling back stops there.
     func firstListening() throws -> Date? {
         var first: Date?
