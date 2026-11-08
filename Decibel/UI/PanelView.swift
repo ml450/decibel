@@ -139,6 +139,10 @@ private struct LevelsCard: View {
     @State private var scroller = PeriodScroller()
     /// Which way the last step went, so the chart slides in from the right side.
     @State private var lastStep = -1
+    /// The bar that was hovered last; the others stay dimmed until their colour has risen back.
+    @State private var dimmedExcept: Date?
+    /// Where the returning colour has reached (30 = bottom of the bars, 110 = top).
+    @State private var colourLevel = 30.0
 
     var body: some View {
         @Bindable var model = model
@@ -192,12 +196,20 @@ private struct LevelsCard: View {
                         .cornerRadius(4)
                 }
                 ForEach(s.buckets) { b in
+                    let top = max(38, min(b.avgDB, 110))
+                    let dim = dimmedExcept != nil && dimmedExcept != b.start
+                    let width: MarkDimension = range == .sixMonths || range == .year ? .automatic : .ratio(0.55)
+                    let colour = b.avgDB >= 80 ? Theme.loud : Theme.accent
                     BarMark(x: .value("Time", b.start, unit: range.bucket),
-                            yStart: .value("Floor", 30),
-                            yEnd: .value("Average", max(38, min(b.avgDB, 110))),
-                            width: range == .sixMonths || range == .year ? .automatic : .ratio(0.55))
-                        .foregroundStyle(b.avgDB >= 80 ? Theme.loud : Theme.accent)
-                        .opacity(selectedStart == nil || selectedStart == b.start ? 1 : 0.35)
+                            yStart: .value("Floor", 30), yEnd: .value("Average", top), width: width)
+                        .foregroundStyle(colour)
+                        .opacity(dim ? 0.35 : 1)
+                        .cornerRadius(4)
+                    // After hovering, full colour fills the dimmed bars from the bottom up.
+                    BarMark(x: .value("Time", b.start, unit: range.bucket),
+                            yStart: .value("Floor", 30), yEnd: .value("Colour", dim ? min(top, colourLevel) : 30),
+                            width: width)
+                        .foregroundStyle(colour)
                         .cornerRadius(4)
                 }
                 RuleMark(y: .value("Limit", 80))
@@ -252,6 +264,24 @@ private struct LevelsCard: View {
                 }
             }
             .onDisappear { scroller.stop() }
+        }
+        .onChange(of: selection) {
+            let start = selection.flatMap { date -> Date? in
+                guard s.interval.contains(date), date <= Date() else { return nil }
+                return Calendar.current.dateInterval(of: range.bucket, for: date)?.start
+            }
+            if let start {
+                // Hovering: dim the others at once.
+                var t = Transaction(); t.disablesAnimations = true
+                withTransaction(t) { dimmedExcept = start; colourLevel = 30 }
+            } else if dimmedExcept != nil {
+                withAnimation(.easeOut(duration: 0.45)) { colourLevel = 110 }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    guard selection == nil else { return }
+                    var t = Transaction(); t.disablesAnimations = true
+                    withTransaction(t) { dimmedExcept = nil; colourLevel = 30 }
+                }
+            }
         }
         // Leaving the card always lets go of the hovered day.
         .onHover { inside in if !inside { selection = nil } }
