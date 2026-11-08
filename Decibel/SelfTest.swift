@@ -148,6 +148,16 @@ enum SelfTest {
                 && Updater.installTarget(running: downloads, writable: { $0 == "/Applications" }).path == "/Applications/Decibel.app"
             check("update target", ok, "in place when writable; translocated, disk image or read-only go to /Applications")
         }
+        do {
+            var cal = Calendar(identifier: .gregorian)
+            cal.timeZone = TimeZone(identifier: "Europe/Oslo")!
+            let now = cal.date(from: DateComponents(year: 2026, month: 11, day: 11, hour: 15))!   // a Wednesday
+            let week = TimeRange.week.interval(now: now, offset: -1, calendar: cal)
+            let day = TimeRange.day.interval(now: now, offset: -2, calendar: cal)
+            let ok = cal.component(.day, from: week.start) == 2 && cal.component(.day, from: week.end) == 9
+                && cal.component(.day, from: day.start) == 9 && day.duration == 86_400
+            check("period scrolling", ok, "week −1 = Nov 2–8, day −2 = Nov 9")
+        }
         check("update versions", Updater.isNewer("1.1", than: "1.0") && Updater.isNewer("1.0.1", than: "1.0")
               && Updater.isNewer("1.10", than: "1.9") && !Updater.isNewer("1.0", than: "1.0.0")
               && !Updater.isNewer("0.9", than: "1.0"), "1.1 > 1.0, 1.0.1 > 1.0, 1.10 > 1.9, 1.0 = 1.0.0")

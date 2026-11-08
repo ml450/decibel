@@ -103,8 +103,9 @@ final class DecibelStore {
         }
     }
 
-    func summary(for range: TimeRange, now: Date = Date(), calendar: Calendar = .current) throws -> RangeSummary {
-        let interval = range.interval(now: now, calendar: calendar)
+    func summary(for range: TimeRange, offset: Int = 0, now: Date = Date(),
+                 calendar: Calendar = .current) throws -> RangeSummary {
+        let interval = range.interval(now: now, offset: offset, calendar: calendar)
         var buckets: [Date: LevelAccumulator] = [:]
         var devices: [String: LevelAccumulator] = [:]
         var total = LevelAccumulator()
@@ -129,6 +130,16 @@ final class DecibelStore {
             buckets: buckets.compactMap { date, acc in acc.leq.map { Bucket(start: date, seconds: acc.seconds, avgDB: $0) } }
                 .sorted { $0.start < $1.start },
             devices: devices.compactMapValues { acc in acc.leq.map { DeviceUsage(seconds: acc.seconds, avgDB: $0) } })
+    }
+
+    /// When listening was first recorded (nil = never); scrolling back stops there.
+    func firstListening() throws -> Date? {
+        var first: Date?
+        try db.query("SELECT MIN(ts) FROM minutes WHERE avg_db >= \(Self.audibleFloor)", []) { r in
+            let ts = r.int(0)
+            if ts > 0 { first = Date(timeIntervalSince1970: TimeInterval(ts)) }
+        }
+        return first
     }
 
     /// Rolling 7-day dose (1.0 = 80 dB(A) for 40 h, 3 dB exchange rate).

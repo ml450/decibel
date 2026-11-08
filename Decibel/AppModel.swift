@@ -39,7 +39,25 @@ final class AppModel {
     private(set) var connectedUIDs: Set<String> = []
     private(set) var summary = RangeSummary.empty
     private(set) var weeklyDose = 0.0
-    var range: TimeRange = .week { didSet { reloadStats() } }
+    var range: TimeRange = .week {
+        didSet { periodOffset = 0; reloadStats() }
+    }
+    /// 0 = the current period; −1 the one before, and so on (scrolled in the chart).
+    private(set) var periodOffset = 0
+
+    /// One scroll step back (−1) or forward (+1). Stops at now and at the first recorded listening.
+    @discardableResult
+    func shiftPeriod(_ delta: Int) -> Bool {
+        let next = min(0, periodOffset + delta)
+        guard next != periodOffset else { return false }
+        if delta < 0 {
+            guard let first = try? store.firstListening(),
+                  range.interval(now: Date(), offset: next).end > first else { return false }
+        }
+        periodOffset = next
+        reloadStats()
+        return true
+    }
 
     var page: PanelPage = .home
     /// Where "Back" goes from a sub-page.
@@ -598,7 +616,7 @@ final class AppModel {
 
     func reloadStats() {
         do {
-            summary = try store.summary(for: range)
+            summary = try store.summary(for: range, offset: periodOffset)
             weeklyDose = try store.weeklyDose()
         } catch {
             log.error("Loading stats failed: \(error.localizedDescription, privacy: .public)")

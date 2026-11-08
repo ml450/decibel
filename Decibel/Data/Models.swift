@@ -113,6 +113,23 @@ enum TimeRange: String, CaseIterable, Identifiable {
     /// D shows hours; every other range shows one bar per day.
     var bucket: Calendar.Component { self == .day ? .hour : .day }
 
+    /// How far one scroll step moves this range.
+    var step: (component: Calendar.Component, value: Int) {
+        switch self {
+        case .day: (.day, 1)
+        case .week: (.weekOfYear, 1)
+        case .month: (.month, 1)
+        case .sixMonths: (.month, 6)
+        case .year: (.year, 1)
+        }
+    }
+
+    /// `offset` periods back (negative) from the one containing `now`.
+    func interval(now: Date, offset: Int, calendar: Calendar = .current) -> DateInterval {
+        let shifted = calendar.date(byAdding: step.component, value: step.value * offset, to: now) ?? now
+        return interval(now: shifted, calendar: calendar)
+    }
+
     func interval(now: Date, calendar: Calendar = .current) -> DateInterval {
         let today = calendar.startOfDay(for: now)
         if self == .week {

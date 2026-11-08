@@ -76,6 +76,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                     model.loudnessNotice = "Paused because you changed the target. Resume to continue, or reset to start over."
                 }
             }
+            if let b = args.firstIndex(of: "--back"), b + 1 < args.count, let n = Int(args[b + 1]) {
+                for _ in 0..<n { model.shiftPeriod(-1) }
+            }
             model.reloadStats()
             // Stand-in for the popover material, which ImageRenderer can't draw.
             let renderer = ImageRenderer(content: PanelView().environment(model)

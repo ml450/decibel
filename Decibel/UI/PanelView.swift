@@ -135,6 +135,10 @@ private struct CaptureStatusCard: View {
 private struct LevelsCard: View {
     @Environment(AppModel.self) private var model
     @State private var selection: Date?
+    /// Scrolling over the chart moves back and forth in time, like the Health app.
+    @State private var scroller = PeriodScroller()
+    /// Which way the last step went, so the chart slides in from the right side.
+    @State private var lastStep = -1
 
     var body: some View {
         @Bindable var model = model
@@ -208,14 +212,75 @@ private struct LevelsCard: View {
             .frame(height: 104)
             .overlay {
                 if s.buckets.isEmpty {
-                    Text("No listening yet").font(.caption).foregroundStyle(.secondary)
+                    Text(model.periodOffset == 0 ? "No listening yet" : "No listening")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
+            .id("\(range.rawValue)\(model.periodOffset)")
+            .transition(.push(from: lastStep < 0 ? .leading : .trailing))
+            .clipped()
+            .onHover { inside in
+                if inside {
+                    scroller.start { delta in
+                        lastStep = delta
+                        selection = nil
+                        var moved = false
+                        withAnimation(.smooth(duration: 0.3)) { moved = model.shiftPeriod(delta) }
+                        return moved
+                    }
+                } else {
+                    scroller.stop()
+                }
+            }
+            .onDisappear { scroller.stop() }
         }
         .onChange(of: model.range) { selection = nil }
     }
 
-    /// Empty "track" bars behind the data for the short ranges.
+    /// Turns scroll-wheel notches and sideways trackpad swipes into one-period steps (−1 back, +1 forward).
+@MainActor
+final class PeriodScroller {
+    private var monitor: Any?
+    private var accumulated: CGFloat = 0
+    private var steppedThisGesture = false
+    private var lastWheelStep = Date.distantPast
+
+    func start(_ step: @escaping (Int) -> Bool) {
+        stop()
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            self?.handle(event, step)
+            return event
+        }
+    }
+
+    func stop() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+    }
+
+    private func handle(_ event: NSEvent, _ step: (Int) -> Bool) {
+        if event.hasPreciseScrollingDeltas {
+            // Trackpad / Magic Mouse: one step per sideways swipe, ignoring the momentum afterwards.
+            guard event.momentumPhase.isEmpty else { return }
+            if event.phase.contains(.began) { accumulated = 0; steppedThisGesture = false }
+            guard abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) else { return }
+            accumulated += event.scrollingDeltaX
+            if !steppedThisGesture, abs(accumulated) > 30 {
+                steppedThisGesture = true
+                // Fingers moving right pull in the past, like paging in Health.
+                _ = step(accumulated > 0 ? -1 : 1)
+            }
+        } else {
+            // Mouse wheel: each notch is a step (up/left = back), with a short pause so one flick isn't five.
+            let d = abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) ? event.scrollingDeltaX : event.scrollingDeltaY
+            guard d != 0, Date().timeIntervalSince(lastWheelStep) > 0.18 else { return }
+            lastWheelStep = Date()
+            _ = step(d > 0 ? -1 : 1)
+        }
+    }
+}
+
+/// Empty "track" bars behind the data for the short ranges.
     private func slots(_ s: RangeSummary, _ range: TimeRange) -> [Date] {
         guard [.day, .week, .month].contains(range) else { return [] }
         var out: [Date] = []

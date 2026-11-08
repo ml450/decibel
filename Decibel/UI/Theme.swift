@@ -104,7 +104,12 @@ enum Format {
     }
 
     static func rangeLabel(_ range: TimeRange, _ interval: DateInterval) -> String {
-        if range == .day { return "Today" }
+        if range == .day {
+            let cal = Calendar.current
+            if cal.isDateInToday(interval.start) { return "Today" }
+            if cal.isDateInYesterday(interval.start) { return "Yesterday" }
+            return interval.start.formatted(.dateTime.weekday(.wide).day().month(.abbreviated))
+        }
         let f = DateIntervalFormatter()
         f.dateStyle = .medium
         f.timeStyle = .none
