@@ -144,10 +144,13 @@ private struct LevelsCard: View {
         @Bindable var model = model
         let s = model.summary
         let range = model.range
-        let selected = selection.flatMap { date in
-            s.buckets.first { Calendar.current.isDate($0.start, equalTo: date, toGranularity: range.bucket) }
+        // The hovered day (or hour), also when nothing was played then; never one in the future.
+        let selectedStart: Date? = selection.flatMap { date in
+            guard s.interval.contains(date), date <= Date() else { return nil }
+            return Calendar.current.dateInterval(of: range.bucket, for: date)?.start
         }
-        let avg = selected?.avgDB ?? s.avgDB
+        let selected = selectedStart.flatMap { start in s.buckets.first { $0.start == start } }
+        let avg = selectedStart == nil ? s.avgDB : selected?.avgDB
 
         Card {
             HStack(alignment: .top) {
@@ -172,9 +175,9 @@ private struct LevelsCard: View {
                         .foregroundStyle(avg >= 80 ? Theme.loud : Theme.safe)
                     Text("·").foregroundStyle(.tertiary)
                 }
-                Text(Format.duration(selected?.seconds ?? s.seconds))
+                Text(Format.duration(selectedStart == nil ? s.seconds : selected?.seconds ?? 0))
                 Text("·").foregroundStyle(.tertiary)
-                Text(selected.map { bucketLabel($0.start) } ?? Format.rangeLabel(range, s.interval))
+                Text(selectedStart.map { bucketLabel($0) } ?? Format.rangeLabel(range, s.interval))
             }
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -185,7 +188,7 @@ private struct LevelsCard: View {
                     BarMark(x: .value("Time", d, unit: range.bucket),
                             yStart: .value("Floor", 30), yEnd: .value("Top", 110),
                             width: .ratio(0.55))
-                        .foregroundStyle(Theme.accent.opacity(0.08))
+                        .foregroundStyle(Theme.accent.opacity(selectedStart == d ? 0.2 : 0.08))
                         .cornerRadius(4)
                 }
                 ForEach(s.buckets) { b in
@@ -194,7 +197,7 @@ private struct LevelsCard: View {
                             yEnd: .value("Average", max(38, min(b.avgDB, 110))),
                             width: range == .sixMonths || range == .year ? .automatic : .ratio(0.55))
                         .foregroundStyle(b.avgDB >= 80 ? Theme.loud : Theme.accent)
-                        .opacity(selected == nil || selected?.start == b.start ? 1 : 0.35)
+                        .opacity(selectedStart == nil || selectedStart == b.start ? 1 : 0.35)
                         .cornerRadius(4)
                 }
                 RuleMark(y: .value("Limit", 80))
@@ -208,7 +211,22 @@ private struct LevelsCard: View {
             .chartYScale(domain: 30...110)
             .chartYAxis(.hidden)
             .chartXAxis { xAxis(range) }
-            .chartXSelection(value: $selection)
+            // Hover picks a bar anywhere in its column, down past the day letters to the card's edge.
+            .chartOverlay { proxy in
+                GeometryReader { geo in
+                    Rectangle().fill(.clear).contentShape(Rectangle())
+                        .padding(.bottom, -12)
+                        .onContinuousHover { phase in
+                            switch phase {
+                            case .active(let point):
+                                guard let plot = proxy.plotFrame else { return }
+                                selection = proxy.value(atX: point.x - geo[plot].origin.x, as: Date.self)
+                            case .ended:
+                                selection = nil
+                            }
+                        }
+                }
+            }
             .frame(height: 104)
             .overlay {
                 if s.buckets.isEmpty {
@@ -218,7 +236,8 @@ private struct LevelsCard: View {
             }
             .id("\(range.rawValue)\(model.periodOffset)")
             .transition(.push(from: lastStep < 0 ? .leading : .trailing))
-            .clipped()
+            // Clip the slide to the chart, but keep the 12 pt below it so hovering there still works.
+            .padding(.bottom, 12).clipped().padding(.bottom, -12)
             .onHover { inside in
                 if inside {
                     scroller.start { delta in
@@ -234,6 +253,8 @@ private struct LevelsCard: View {
             }
             .onDisappear { scroller.stop() }
         }
+        // Leaving the card always lets go of the hovered day.
+        .onHover { inside in if !inside { selection = nil } }
         .onChange(of: model.range) { selection = nil }
     }
 
