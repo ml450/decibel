@@ -45,15 +45,28 @@ final class AppModel {
     /// 0 = the current period; −1 the one before, and so on (scrolled in the chart).
     private(set) var periodOffset = 0
 
-    /// One scroll step back (−1) or forward (+1). Stops at now and at the first recorded listening.
-    @discardableResult
-    func shiftPeriod(_ delta: Int) -> Bool {
+    /// Whether one step back (−1) or forward (+1) has anything to show: not past now, not before the first listening.
+    func canShiftPeriod(_ delta: Int) -> Bool {
         let next = min(0, periodOffset + delta)
         guard next != periodOffset else { return false }
         if delta < 0 {
-            guard let first = try? store.firstListening(),
-                  range.interval(now: Date(), offset: next).end > first else { return false }
+            if !firstListeningLoaded {
+                firstListeningCache = try? store.firstListening()
+                firstListeningLoaded = true
+            }
+            guard let first = firstListeningCache, range.interval(now: Date(), offset: next).end > first else { return false }
         }
+        return true
+    }
+    /// Cached so the swipe can ask on every frame without touching the database.
+    @ObservationIgnored private var firstListeningCache: Date?
+    @ObservationIgnored private var firstListeningLoaded = false
+
+    /// One scroll step back (−1) or forward (+1). Stops at now and at the first recorded listening.
+    @discardableResult
+    func shiftPeriod(_ delta: Int) -> Bool {
+        guard canShiftPeriod(delta) else { return false }
+        let next = min(0, periodOffset + delta)
         periodOffset = next
         reloadStats()
         return true
