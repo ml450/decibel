@@ -165,7 +165,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 91;
+				CURRENT_PROJECT_VERSION = 100;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = NO;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -178,7 +178,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.3;
+				MARKETING_VERSION = 2.4;
 				OTHER_CODE_SIGN_FLAGS = "--requirements \"$(SRCROOT)/Signing/designated.req\"";
 				PRODUCT_BUNDLE_IDENTIFIER = local.hearing.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -194,7 +194,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 91;
+				CURRENT_PROJECT_VERSION = 100;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = NO;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -207,7 +207,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.3;
+				MARKETING_VERSION = 2.4;
 				OTHER_CODE_SIGN_FLAGS = "--requirements \"$(SRCROOT)/Signing/designated.req\"";
 				PRODUCT_BUNDLE_IDENTIFIER = local.hearing.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
