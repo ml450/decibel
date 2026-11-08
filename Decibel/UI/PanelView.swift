@@ -192,7 +192,7 @@ private struct LevelsCard: View {
                     BarMark(x: .value("Time", d, unit: range.bucket),
                             yStart: .value("Floor", 30), yEnd: .value("Top", 110),
                             width: .ratio(0.55))
-                        .foregroundStyle(Theme.accent.opacity(selectedStart == d ? 0.2 : 0.08))
+                        .foregroundStyle(Theme.accent.opacity(0.08))
                         .cornerRadius(4)
                 }
                 ForEach(s.buckets) { b in
